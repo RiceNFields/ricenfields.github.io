@@ -40,15 +40,13 @@ To understand rules behind static variables let us take a short dive into the la
 
 
 ## Land of Assembly
-Rust is a native language that compiles down to assembly. This stuff is platform dependent so take it with a grain of salt.
-
-An assembly program is generally divided three sections
+Rust is a native language that compiles down to assembly. An assembly program is generally divided three sections:
 
 - data
 - bss
 - text
 
-The `data` section contains all the initialized static variables with their initial value, `bss` section contains all uninitialized/zero-initialized static variables and finally the `text` section contains all our code in assembly. You can read more about assembly layout [here](https://en.wikipedia.org/wiki/Data_segment).
+The `data` section contains all the initialized static variables with their initial value, `bss` section contains all uninitialized/zero-initialized static variables and finally the `text` section contains all our code in assembly. You can read more about assembly layout [here](https://en.wikipedia.org/wiki/Data_segment). (This stuff is platform dependent so take it with a grain of salt.)
 
 
 ## Back to Rust
@@ -69,11 +67,11 @@ static mut MEM: Option<Box<i32>> = None;
 unsafe { MEM = Some(Box::new(5)) };
 ```
 <p class="message">
-It is not recommended to use mutable static since it is quite easy run into an undefined behavior with it.<br />
+It is not recommended to use mutable static since it is quite easy to run into an undefined behavior with it.<br />
 I recommend using <a herf="https://crates.io/crates/lazy_static">lazy_static</a> or checking end part of this article for slightly better implementation.
 </p>
 
-In Rust reading or writing a mutable static in rust is unsafe because static variables are shared between threads and a mutable static might run into race conditions in a concurrent program, so it is particularly important to guard a mutable static with locks. *One of Rust's goals is to make concurrency bugs hard to run into.*
+In Rust reading or writing a mutable static in rust is unsafe because static variables are shared between threads and a mutable static might run into race conditions in a concurrent program, so it is particularly important to guard a mutable static with lock. *One of Rust's goals is to make concurrency bugs hard to run into.*
 
 Let us now move our focus to C++,
 
@@ -82,7 +80,7 @@ Let us now move our focus to C++,
 C++ allows initialization of a static variable even with a state that can only be known at runtime. This is possible mainly because of two reasons: First, C++ allows uninitialized variables and Second C++ can do static initialization in runtime before main executes if necessary.
 
 
-C++ runs static initialization code before executing main which leads to an extremely hard to detect problem known as [the static initialization order fiasco](https://www.cs.technion.ac.il/users/yechiel/c++-faq/static-init-order.html). Also, In C++ it is not clear if a variable is being initialized at compile time or at runtime (C++20 solves this problem with [constinit](https://en.cppreference.com/w/cpp/language/constinit) which makes sure that a static variable can be initialized at compile-time, but there is currently no solution for the static initialization fiasco in C++).
+C++ if necessary runs static initialization code before executing main which may lead to an extremely hard to detect problem known as [the static initialization order fiasco](https://www.cs.technion.ac.il/users/yechiel/c++-faq/static-init-order.html). Also, In C++ it is not clear if a variable is being initialized at compile time or at runtime (C++20 solves this problem with [constinit](https://en.cppreference.com/w/cpp/language/constinit) which makes sure that a static variable can be initialized at compile-time, but there is currently no solution for the static initialization fiasco in C++).
 
 ```c++
 
