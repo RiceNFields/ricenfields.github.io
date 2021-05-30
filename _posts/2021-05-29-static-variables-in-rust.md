@@ -8,7 +8,7 @@ tags:
   - rust
 ---
 
-Hello there, I hope you are doing ok. Today I would like to talk about static variables in rust, compare them with static variables in C++ and try to reason about the rules imposed by Rust on static variables.
+Hello there, I hope you are doing ok. Today I would like to talk about static variables in Rust, compare them with static variables in C++ and try to reason about the rules imposed by Rust on static variables.
 
 ## Introduction
 Static variable are variables declared with a `static` keyword and represent a specific global memory location (They are also known as global variables). Static variables have static life-time, a static life-time never goes out of scope and is guaranteed to out live any other variable. Meaning even if they are declared inside a scope their life-time does not begin or end with the scope.
@@ -26,7 +26,7 @@ func()
 func()
 ```
 
-*In rust static variable must be initialized at compile-time* (Meaning they cannot be initialized with state that can only be known at runtime). Also, *mutating a static variable is only possible in an unsafe context*. In this post we'll try to reason about these rules that are imposed by Rust on the static variables and also talk about why such rules are important.
+*In Rust static variable must be initialized at compile-time* (Meaning they cannot be initialized with state which can only be known at runtime). Also, *mutating a static variable is only possible in an unsafe context*. In this post we'll try to reason about these rules that are imposed by Rust on the static variables and also talk about why such rules are important.
 
 ```rust
 // OK - 0 can be known at comple time.
@@ -40,7 +40,7 @@ To understand rules behind static variables let us take a short dive into the la
 
 
 ## Land of Assembly
-Rust is a native language that compiles down to assembly. An assembly program is generally divided three sections:
+Rust is a native language that compiles down to assembly. An assembly program is generally divided into three sections:
 
 - data
 - bss
@@ -51,10 +51,10 @@ The `data` section contains all the initialized static variables with their init
 
 ## Back to Rust
 
-Rust does not allow uninitialized variables (static or non-static). So, the data, bss section may contain either initialized or zero-initialized static variables. Also, **since assembly is generated after compiling the rust code and the assembly must contain static variables in special sections the static variable must be initialized at compile time**.
+Rust does not allow uninitialized variables (static or non-static). So, the data, bss section may contain either initialized or zero-initialized static variables. Also, **since assembly is generated after compiling the Rust code and the assembly must contain static variables in special sections the static variable must be initialized at compile time**.
 
 
-This does not mean you cannot have static variable that stores a state that can be only known at runtime. This just means that you need to initialize static with compile-time known state or value. We can easily store a value that can only be known at runtime using `enum` (variant) or something like `Option<T>`, setting them to a compile-time known value and then updating again later at runtime.
+This does not mean you cannot have static variable which stores a state which can only be known at runtime. This just means that you need to initialize static with compile-time known state or value. We can easily store a value which can only be known at runtime using `enum` (variant) or something like `Option<T>`, setting them to a compile-time known value and then updating again later at runtime.
 
 
 ```rust
@@ -71,13 +71,13 @@ It is not recommended to use mutable static since it is quite easy to run into a
 I recommend using <a herf="https://crates.io/crates/lazy_static">lazy_static</a> or checking end part of this article for slightly better implementation.
 </p>
 
-In Rust reading or writing a mutable static in rust is unsafe because static variables are shared between threads and a mutable static might run into race conditions in a concurrent program, so it is particularly important to guard a mutable static with lock. *One of Rust's goals is to make concurrency bugs hard to run into.*
+In Rust, reading or writing a mutable static is unsafe because static variables are shared between threads and a mutable static might run into race conditions in a concurrent program, so it is particularly important to guard a mutable static with lock. *One of Rust's goals is to make concurrency bugs hard to run into.*
 
 Let us now move our focus to C++,
 
 ## Static Initialization in C++
 
-C++ allows initialization of a static variable even with a state that can only be known at runtime. This is possible mainly because of two reasons: First, C++ allows uninitialized variables and Second C++ can do static initialization in runtime before main executes if necessary.
+C++ allows initialization of a static variable even with a state which can only be known at runtime. This is possible mainly because of two reasons: First, C++ allows uninitialized variables and Second C++ can do static initialization in runtime before main executes if necessary.
 
 
 C++ if necessary runs static initialization code before executing main which may lead to an extremely hard to detect problem known as [the static initialization order fiasco](https://www.cs.technion.ac.il/users/yechiel/c++-faq/static-init-order.html). Also, In C++ it is not clear if a variable is being initialized at compile time or at runtime (C++20 solves this problem with [constinit](https://en.cppreference.com/w/cpp/language/constinit) which makes sure that a static variable can be initialized at compile-time, but there is currently no solution for the static initialization fiasco in C++).
@@ -109,7 +109,7 @@ auto some_function() -> ComplexType {
 }
 ```
 
-Rust solves all these issues that C++ suffers from by allowing static variables to only be initialized with a state that can be known at compile-time and making mutable static variables unsafe.
+Rust solves all these issues that C++ suffers from by allowing static variables to only be initialized with a state which can be known at compile-time and making mutable static variables unsafe.
 
 ```rust
 
@@ -128,7 +128,7 @@ Hence, when it comes to static variables Rust has fairly good reasons to impose 
 
 ## Better Example
 
-As promised a better example for static variable that stores a value that can be only known at runtime. Try it live on [godbolt](https://godbolt.org/z/81oe7Mc58).
+As promised a better example for static variable that stores a value which can be only known at runtime. Try it live on [godbolt](https://godbolt.org/z/81oe7Mc58).
 
 ```rust
 use std::sync::Once;

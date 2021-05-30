@@ -4,7 +4,7 @@ highlighter:      rouge
 
 # Setup
 title:            "Rice Fields"
-tagline:          "Rice's Blog"
+tagline:          "A blog dedicated to by hobbies and interests."
 description:      'Hey there! I am rice who loves computer in a vast field of ricefields.'
 url:              https://ricefields.me
 #baseurl:          '/blog'
@@ -26,6 +26,7 @@ plugins:
   - jekyll-feed
   - jekyll-gist
   - jekyll-paginate
+  - jekyll-seo-tag
 
 exclude:
   - Gemfile
@@ -58,3 +59,10 @@ hydeout:
   repo:             https://github.com/RiceNFields
   twitter:          https://twitter.com/RiceNFields
   email:            ashishbhattarai@protonmail.com
+
+# SEO config
+twitter:
+  username: RiceNFields
+  card: summary
+
+logo: "/android-chrome-512x512.png"
