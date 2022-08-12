@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Code Principle&#58; Data & Transformation
-excerpt: "We discuss how thinking software design in terms of data and transformation helps improve over all software design."
+excerpt: "We discuss how thinking software design in terms of data and transformation helps improve overall software design."
 comments: false
 tags:
   - code
@@ -216,7 +216,7 @@ class Cart {
 
   // Applies discount to all orders in the cart-
   // which match the given orderIds, mutating the cart
-  function applyDiscountOrders(orderIds, discountValue) {
+  function applyDiscountOnOrders(orderIds, discountValue) {
     // iterate through each orders in the cart
     for(const cartOrder of this.orders) {
       // iterate through applicable orders
@@ -269,8 +269,6 @@ class Cart {
     const applicableOrders = this.orders.filter((cartOrder) => orderIds.find((applicableOrderId) => cartOrder == applicableOrderId));
     // 2 - apply discount to each order, mutating in on the process
     applicableOrders.forEach((order) => order.applyDiscount(discountValue));
-    // 3 - apply another transformation to calculate total cost
-    return applicableOrders.reduce((acc, curr) => acc + curr.costAfterDiscount, 0);
   }
 }
 ```
