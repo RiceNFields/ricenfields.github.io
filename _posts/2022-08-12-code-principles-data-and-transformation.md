@@ -43,7 +43,7 @@ const dataB = dataA.map((x) => x.toString());
 
 Here, the array of numbers `dataA` is transformed into the array of strings `dataB` via `map`, which is a function that defines the transformation.
 
-## Thinking in terms of transformation
+## Thinking in Terms of Transformation
 
 We can start thinking of a program as a series of transformations. The data passes through one or more transformations, each one of which operates on the data in order to produce the desired output. Let’s make this concept clear with a quick example.
 
@@ -89,7 +89,7 @@ It’s always a good idea to avoid mutation whenever possible. Avoiding mutation
 
 Since 'Thinking in terms of transformation' is a mouthful, let’s just call this `Transformative Programming`.
 
-## Transformative Programing a good design approach
+## Transformative Programing a Good Design Approach
 
 As we have learned, good software design is design that’s easier to change, but we haven’t yet explored what makes bad software design.
 Or to rephrase, **what makes a software difficult to change?**
@@ -163,7 +163,7 @@ We can immediately notice that the code is a lot more readable, along with bette
 
 For example, if we add an additional templated field on the notification object, just by having a glance at the piece of code, we find that the only thing that needs to be updated is `processNotificationContent`.
 
-## Transformative programming in real world
+## Transformative Programming in Real World
 
 At this point, it’s possible to develop the impression that transformative programming is only applicable to functional programming. We will discover this to not be the case, since transformative programming can find its way into your code base and improve it regardless of the style you follow.
 
