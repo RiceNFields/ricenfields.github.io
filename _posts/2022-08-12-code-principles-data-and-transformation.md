@@ -71,12 +71,12 @@ The `user.csv` file here contains our data. Our program basically does 4 operat
 
 To carry out these operations, we move our data through a series of transformations until we reach our end goal.
 
-This approach in programming – where we chain multiple transformations by passing one output as input to another is known as pipelining. Pipelining is mostly provided as a feature in functional languages, where a pipeline operator automatically pipes output of one transformation as input to another.
+This approach in programming – where we chain multiple transformations by passing one output as input to another is known as pipelining. Pipelining is mostly provided as a feature in functional languages, where a pipeline operator `|>` automatically pipes output of one transformation as input to another.
 
 ```elixir
 CSV.parse('user.csv')
-  |> Enum.filter(&!is_nil(&1.email))
-  |> Enum.map(&1.email)
+  |> Enum.filter(& !is_nil(&1.email))
+  |> Enum.map(& &1.email)
   |> send_notification()
   |> Enum.filter(& !&1.success)
 ```
@@ -275,7 +275,7 @@ class Cart {
 }
 ```
 
-Now the code is much more readable. It can be further improved by minimizing mutations and switching to structured types, which in-turn makes our code reusable in a way that wasn’t possible before. Also, I recommend using [lodash](https://lodash.com/) to compensate for lack of proper utilities in javascript.
+Now the code is much more readable. It can be further improved by minimizing mutations and switching to structured types, which in-turn makes our code reusable in a way that wasn’t possible before. Also, I recommend using something like [lodash](https://lodash.com/) to compensate for lack of proper utilities in javascript.
 
 ```typescript
 /**
