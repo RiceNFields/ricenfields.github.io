@@ -19,7 +19,7 @@ We shall begin by forming a concise yet flexible criteria for 'good design'.
 
 ## What is Good Software Design ?
 
-Software – as its name suggests – is meant to change and extend. It is 'soft', unlike hardware, which is generally meant to be fixed (hard). Software is expected to be susceptible to changes. When the requirements change, it falls upon us the developers to make sure that our software effectively adapts to the proposed changes. This often boils down to diving into the code base and making required changes. Based on this, we can argue that good software design is design that is susceptible to change - i.e. easier to change.
+Software – as its name suggests – is meant to change and extend. It is 'soft', unlike hardware, which is generally meant to be fixed (hard). Software is expected to be susceptible to changes. When the requirements change, it falls upon us the developers to make sure that our software effectively adapts to the proposed changes. This often boils down to diving into the codebase and making required changes. Based on this, we can argue that good software design is design that is susceptible to change - i.e. easier to change.
 
 There are many patterns, principles and guidelines that help in designing software that is easier to change. Taking `Data Transformation` into account while designing is one such guideline that we’ll be exploring today.
 
@@ -92,9 +92,9 @@ Since 'Thinking in terms of transformation' is a mouthful, let’s just call t
 ## Transformative Programing a Good Design Approach
 
 As we have learned, good software design is design that’s easier to change, but we haven’t yet explored what makes bad software design.
-Or to rephrase, **what makes a software difficult to change?**
+Or to rephrase, _what makes a software difficult to change?_
 
-> `Coupling`
+**Coupling.**
 
 <p class="message">
 <i>Coupling ties things together, so that it's harder to change just one thing.</i>
@@ -174,22 +174,23 @@ Let's have a look at yet another contrived example:
 > Leys say, we have an e-commerce application, and need to calculate discounts for product orders in a shopping cart, based on a known fixed discount value. The discount might be applied to select orders or the whole cart (all orders).
 
 ```typescript
-
 // Example:1 - Normal OOP
 class Order {
   /* Everything that a typical order contains */
 
   // Applies discount and calculates final cost
-  function calculateCostWithDiscount(discountValue) {
-      // calculate new cost
-      const newCost = this.cost - discountValue;
-      // check if its within range
-      return (newCost > this.lowestPossiblePrice)? newCost : this.lowestPossiblePrice;
+  calculateCostWithDiscount(discountValue) {
+    // calculate new cost
+    const newCost = this.cost - discountValue;
+    // check if its within range
+    return newCost > this.lowestPossiblePrice
+      ? newCost
+      : this.lowestPossiblePrice;
   }
 
   // Applies discount to the order, mutating the order
-  function applyDiscount(discountValue) {
-     this.costAfterDiscount = calculateCostWithDiscount(discountValue);
+  applyDiscount(discountValue) {
+    this.costAfterDiscount = calculateCostWithDiscount(discountValue);
   }
 }
 
@@ -197,32 +198,28 @@ class Cart {
   /* Everything that a typical order contains */
 
   // Calculates total cost with discount applied to all orders in the card
-  function calculateTotalCostWithDiscount(discountValue) {
+  calculateTotalCostWithDiscount(discountValue) {
     const totalDiscount = 0;
     // calculate cost after the discount has been applied
-    for(const order of this.orders) {
+    for (const order of this.orders) {
       totalDiscount += order.calculateCostWithDiscount(discountValue);
     }
     return totalDiscount;
   }
 
-  // Applies discount to all orders in the cart, mutating the cart
-  function applyDiscount(discountValue) {
-    // apply discount to each order, mutating the order in the process
-    for(const order of orders) {
+  // Applies discount to each order in the cart, mutating the cart
+  applyDiscount(discountValue) {
+    for (const order of orders) {
       this.order.applyDiscount(discountValue);
     }
   }
 
   // Applies discount to all orders in the cart-
   // which match the given orderIds, mutating the cart
-  function applyDiscountOnOrders(orderIds, discountValue) {
-    // iterate through each orders in the cart
-    for(const cartOrder of this.orders) {
-      // iterate through applicable orders
-      for(const applicableOrderId of orderIds) {
-        // apply discount if the order is applicable
-        if(cartOrder.id == applicableOrderId) {
+  applyDiscountOnOrders(orderIds, discountValue) {
+    for (const cartOrder of this.orders) {
+      for (const applicableOrderId of orderIds) {
+        if (cartOrder.id == applicableOrderId) {
           cartOrder.applyDiscount(discountValue);
         }
       }
@@ -238,7 +235,7 @@ Here we have a basic cart-order system written with an Object-Oriented approach,
 class Order {
   /* Everything that a typical order contains */
 
-  function calculateCostWithDiscount(discountValue) {
+  calculateCostWithDiscount(discountValue) {
     // we leverage Math.max instead of comparing values
     return Math.max(this.cost - discountValue, this.lowestPossiblePrice);
   }
@@ -251,7 +248,7 @@ class Order {
 class Cart {
   /* Everything that a typical cart contains */
 
-  function calculateTotalCostWithDiscount(discountValue) {
+  calculateTotalCostWithDiscount(discountValue) {
     // return this.orders.reduce((acc, curr) => acc + curr.calcluateDiscount(discountValue), 0);
 
     // 1 - we first transform orders into number (cost with discount)
@@ -260,11 +257,11 @@ class Cart {
     return discounts.reduce((acc, curr) => acc + curr, 0);
   }
 
-  function applyDiscount(discountValue) {
+  applyDiscount(discountValue) {
     this.orders.forEach((order) => order.applyDiscount(discountValue));
   }
 
-  function applyDiscountOnOrders(orderIds, discountValue) {
+  applyDiscountOnOrders(orderIds, discountValue) {
     // 1 - we transform cart orders into applicableOrders using filter + find
     const applicableOrders = this.orders.filter((cartOrder) => orderIds.find((applicableOrderId) => cartOrder == applicableOrderId));
     // 2 - apply discount to each order, mutating in on the process
@@ -352,7 +349,7 @@ function cartWithDiscountOnOrders(
 }
 ```
 
-Let’s add some additional functionality – like payment processing, and conditions for discounts to be applicable, which are just more transformations that contains steps required to process a payment.
+Let’s add some additional functionality – like payment processing, and conditions for discounts to be applicable, which are just more transformations that contain steps required to process a payment.
 
 > The discount should be applied only if the total cost of the cart is greater than a certain threshold.
 
@@ -382,7 +379,7 @@ const discountedCart = cartWithDiscount(cart, constrainedDiscountValue);
 // 4- process payment
 const paymentProcessedCart = processPayment(cart, paymentOptions);
 /**
-  Some where down the line, we save our most recent state
+  Somewhere down the line, we save our most recent state
  */
 db.presist(paymentProcessedCart);
 ```
