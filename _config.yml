@@ -16,7 +16,7 @@ url: https://ricefields.me
 
 author:
   name: RiceFields
-  url: https://twitter.com/RiceNFields
+  url: https://twitter.com/RiceDotMe
 
 paginate: 5
 # paginate_path:    '/page:num'
@@ -56,8 +56,8 @@ sidebar_home_link: true
 # own fork.
 hydeout:
   version: 4.2.0
-  repo: https://github.com/RiceNFields
-  twitter: https://twitter.com/RiceNFields
+  repo: https://github.com/AshishBhattarai
+  twitter: https://twitter.com/RiceDotMe
   email: ashishbhattarai@protonmail.com
 
 # SEO config
