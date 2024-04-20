@@ -19,7 +19,7 @@ The most basic data structure for memory allocation is free-list. As the name su
 
 The TLSF memory allocation algorithm provides O(1) memory allocation and deallocation with a good-fit strategy. TSFL utilizes a two-level segregated data structure to optimize lookup on the freelist. Like many data structures in computer science, fast lookup is achieved through binning or bucketing.
 
-The basic idea is to have N blocks or bins, each of which is further divided in M blocks or sub-bins. These sub-bins then store our free lists.
+The basic idea is to have M blocks or bins, each of which is further divided in N blocks or sub-bins. These sub-bins then store our free lists.
 ![Two Level Bin](/assets/images/tlsf/TLSF_Basic.webp){:style="display:block; margin-left:auto; margin-right:auto"}
 
 To determine the bin sizes, we follow a specific approach. The idea is to arrange first bins in intervals of power of two (2<sup>bin_idx</sup>) and then each bin is further divided into M subbins, with the subbin division being linear.
@@ -148,9 +148,10 @@ fn insertFreeBlock(self: *TSFLAllocator, block: *Block) void {
 }
 ```
 
-And that's it, everything from here on would involve managing the freelist that are associated with our subbins. Since the operations for searching, inserting and removing are now O(1) with the help of our fast bitset lookup, the resulting allocation or free operation is also O(1). This kind of binning algorithm has multiple use cases, with opmitmizing memory allocation being one of them.
+And that's it, everything from here on would involve managing the freelist that are associated with our subbins. Since the operations for searching, inserting and removing are now O(1) with the help of our fast bitset lookup, the resulting allocation or free operation is also O(1). This kind of binning algorithm has multiple use cases, with optimizing memory allocation being one of them.
 
-
+#### Complete Example
+- [Zig Implementation](https://gist.github.com/AshishBhattarai/7cabbba3144e24b95e12b86a33f32647)
 
 ##### References
 - [TLSF: a New Dynamic Memory Allocator for Real-Time Systems](http://www.gii.upv.es/tlsf/files/papers/ecrts04_tlsf.pdf)
