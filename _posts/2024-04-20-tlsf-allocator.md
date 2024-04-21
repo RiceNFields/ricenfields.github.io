@@ -57,7 +57,8 @@ const min_alloc_size: u32 = 1 << linear;
 ```
 
 #### Bin Mapping
-We need to map allocation and memory block sizes to proper bin and subbin indices. Two types of mapping are required here: *map up* and *map down*. Whenever we what to perform a search for free blocks in order to allocate memory, we would need to *map up*, as we need to look for bin which contains blocks that can at least fit our size requirement.
+We need to map allocation and memory block sizes to proper bin and subbin indices. Two types of mapping are required here: *map up* and *map down*. Whenever we what to perform a search for free blocks in order to allocate memory, we would need to *map up*, which is achieved by rounding up the size to the next subbin. This is necessary because we need to look for a subbin which contains blocks that can at least fit the requested size.
+
 ```zig
 fn binmap_up(size: vk.DeviceSize) BinMap {
     const bin_idx: u32 = log2(size | min_alloc_size); // | makes sure size >= min_alloc
@@ -148,6 +149,11 @@ fn insertFreeBlock(self: *TSFLAllocator, block: *Block) void {
 }
 ```
 
+### Good-fit 
+Since we are rounding up the size to the next subbin during free block lookup, TLSF will try to return the smallest chunk of memory big enough to hold the requested block. This makes the algorithm almost best-fit but not exactly best-fit, also called good-fit.
+
+
+### Wrap-Up
 And that's it, everything from here on would involve managing the freelist that are associated with our subbins. Since the operations for searching, inserting and removing are now O(1) with the help of our fast bitset lookup, the resulting allocation or free operation is also O(1). This kind of binning algorithm has multiple use cases, with optimizing memory allocation being one of them.
 
 #### Complete Example
