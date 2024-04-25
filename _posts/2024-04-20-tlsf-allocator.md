@@ -26,7 +26,7 @@ To determine the bin sizes, we follow a specific approach. The idea is to arrang
 
 ![Two Level Bin Division](/assets/images/tlsf/TLSF_Basic_b.webp){:style="display:block; margin-left:auto; margin-right:auto"}
 
-For example, free memory blocks with size in the range [2<sup>4</sup>, 2<sup>5</sup>) will be placed inside bin with index 4. To determine the subbin index, we can take the block size, subtract it with 2<sup>bin_idx</sup> and divide it by *bin_interval / subbin_size*.
+For example, free memory blocks with size in the range [2<sup>4</sup>, 2<sup>5</sup>) will be placed inside bin with index 4. To determine the subbin index, we can take the block size, subtract it with 2<sup>bin_idx</sup> and divide it by *bin_interval / subbin_count*.
 
 Given the memory size, we can compute bin and subbin index with:
 
@@ -41,9 +41,10 @@ In the first-level bin, the starting bin intervals are very small (2<sup>0</sup>
 ![TSFL Linear Bin](/assets/images/tlsf/TLSF_Linear_Bin.webp){:style="display:block; margin-left:auto; margin-right:auto"}
 As you can see, the first bin looks different. Now, the first bin has a fixed size 2<sup>7</sup>, and our second bin starts from 2<sup>8</sup> interval. This also implies that we'll need to subtract our bin index with this fixed size in order to compute actual bin index.
 
-![Final Bin Formulas](/assets/images/tlsf/BinningFormula_Extra.webp){:style="display:block; margin-left:auto; margin-right:auto"}
+First, we define our fixed linear interval (Linear), and then we compute our bin and sub-bin index accordingly.
+![Final Bin Formulas](/assets/images/tlsf/Binning_Formula_Final.webp){:style="display:block; margin-left:auto; margin-right:auto"}
 
-With this, we are ready implement our own TLSF allocator.
+This ensures that all blocks in the range [2^0, 2^7) exist in bin 0, and the range [2^7, ...) starts from bin 1. With these adjustments, we are ready to implement our own TLSF allocator.
 
 ## Implementation Details
 
@@ -60,19 +61,23 @@ const min_alloc_size: u32 = 1 << linear;
 We need to map allocation and memory block sizes to proper bin and subbin indices. Two types of mapping are required here: *map up* and *map down*. Whenever we what to perform a search for free blocks in order to allocate memory, we would need to *map up*, which is achieved by rounding up the size to the next subbin. This is necessary because we need to look for a subbin which contains blocks that can at least fit the requested size.
 
 ```zig
-fn binmap_up(size: vk.DeviceSize) BinMap {
-    const bin_idx: u32 = log2(size | min_alloc_size); // | makes sure size >= min_alloc
+fn binmap_up(size: vk.DeviceSize) BlockMap {
+    const bin_idx: u32 = bit_scan_msb(size | min_alloc_size);
     const log2_subbin_size: u6 = @intCast(bin_idx - sub_bin);
-    const next_subbin_offset = (@as(u64, 1) << (log2_subbin_size)) - 1; // subbin_size - 1
+    const next_subbin_offset = (@as(u64, 1) << (log2_subbin_size)) - 1; // block_size - 1
     const rounded = size +% next_subbin_offset;
-    // rounded_size / block_size
-    const sub_bin_idx: u32 = @intCast(((rounded) >> log2_subbin_size) & (sub_bin_count - 1)); 
-    const adjusted_bin_idx = bin_idx - linear;
+    const sub_bin_idx = rounded >> log2_subbin_size; // rounded_size / block_size
+    
+    const adjusted_bin_idx: u32 = @intCast((bin_idx - linear) + (sub_bin_idx >> sub_bin)); // adjust bin_idx with linear
+    const adjusted_sub_bin_idx: u32 = @intCast(sub_bin_idx & (sub_bin_count - 1)); // sub_bin_idx % sub_bin_count
     const rounded_size = (rounded) & ~next_subbin_offset;
-
+    
+    std.debug.assert(adjusted_bin_idx < bin_count);
+    std.debug.assert(adjusted_sub_bin_idx < sub_bin_count);
+    
     return .{
         .bin_idx = adjusted_bin_idx,
-        .sub_bin_idx = sub_bin_idx,
+        .sub_bin_idx = adjusted_sub_bin_idx,
         .rounded_size = rounded_size,
     };
 }
@@ -80,17 +85,21 @@ fn binmap_up(size: vk.DeviceSize) BinMap {
 
 And for other operations like inserting new free block, we'll map down.
 ```zig
-fn binmap_down(size: vk.DeviceSize) BinMap {
-    const bin_idx: u32 = log2(size | min_alloc_size);
+fn binmap_down(size: vk.DeviceSize) BlockMap {
+    const bin_idx: u32 = bit_scan_msb(size | min_alloc_size);
     const log2_subbin_size: u6 = @intCast(bin_idx - sub_bin);
-    const sub_bin_idx: u32 = @intCast((size >> log2_subbin_size) & (sub_bin_count - 1)); // size / block_size
+    const sub_bin_idx = size >> log2_subbin_size; // size / block_size
 
-    const adjusted_bin_idx = bin_idx - linear;
+    const adjusted_bin_idx: u32 = @intCast((bin_idx - linear) + (sub_bin_idx >> sub_bin));
+    const adjusted_sub_bin_idx: u32 = @intCast(sub_bin_idx & (sub_bin_count - 1));
     const rounded_size = size;
+
+    std.debug.assert(adjusted_bin_idx < bin_count);
+    std.debug.assert(adjusted_sub_bin_idx < sub_bin_count);
 
     return .{
         .bin_idx = adjusted_bin_idx,
-        .sub_bin_idx = sub_bin_idx,
+        .sub_bin_idx = adjusted_sub_bin_idx,
         .rounded_size = rounded_size,
     };
 }
