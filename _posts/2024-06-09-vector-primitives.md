@@ -66,7 +66,7 @@ do support 128-bit vector registers, making it important for programmers to be a
 ## Vector Operations
 Let's go through some of the fundamental operations you can perform with these vector registers:
 
-#### Arthematic 
+#### Arithmetic
 These don't need any explanation; they are just your old regular arithmetic operations. The only difference being, in the case of SIMD vectors, they're element-wise operations. So, if you multiply, add, divide, or subtract two SIMD vectors, the operations will be done element-wise. Here's a simple diagram for multiplication; all other operations work the same way.
 
 ![Simd Mul](/assets/images/simd/simd_mul.webp){:style="display:block; margin-left:auto; margin-right:auto"}
@@ -89,7 +89,7 @@ Mask = [
 ]
 ```
 
-The logical operations like arthematic are applied element wise.
+The logical operations like arithmetic are applied element wise.
 
 ```c
 A = [a0, a1, a2, a3]
@@ -117,7 +117,7 @@ Here, we are copying the first two elements (a0, a1) from A and the last two ele
 
 The representation of the mask differs based on the programming language and its SIMD library. Rust uses concatenated array indices for masks, while Zig uses positive indices to select elements from the first input and negative indices to select elements from the second input.
 
-Rust example, rust uses the world swizzle for data movement operation. [Rust Docs](https://doc.rust-lang.org/nightly/std/simd/macro.simd_swizzle.html)
+Rust example, rust uses the term swizzle for data movement operation. [Rust Docs](https://doc.rust-lang.org/nightly/std/simd/macro.simd_swizzle.html)
 ```rust
 let v1 = f32x4::from_array([1.0, 2.0, 3.0, 4.0]);
 let v2 = f32x4::from_array([5.0, 6.0, 7.0, 8.0]);
@@ -173,7 +173,7 @@ const v1 = @Vector(4, f32){1.0, 2.0, 3.0, 4.0};
 const sum = @reduce(.Add, v1); // 10
 ```
 
-## Practicle Examples
+## Practical Examples
 Now, let's explore some practical use cases for these SIMD vectors and operations we've just covered.
 
 #### Dot Product
@@ -188,8 +188,8 @@ let dot_product = (v1 * v2).reduce_sum();
 
 Similarly, SIMD can be applied to other linear algebra operations such as matrix multiplication, transposition, decomposition, etc. Vectors and matrices are widely used in computer graphics and image processing, making SIMD essential for accelerating computation in these areas
 
-#### Sirrurs Rule
-Sarrus's rule is another mathematical operation often used to calculate the determinant of a 3x3 matrix or the cross product of two 3D vectors.
+#### Sarrus Rule
+Sarrus rule is another mathematical operation often used to calculate the determinant of a 3x3 matrix or the cross product of two 3D vectors.
 
 ```rust
 // 3x3 matrix, assuming the 4th component to be zero
@@ -287,7 +287,7 @@ Auto vectorization is a compiler optimization technique where the compiler autom
 ### Wrap-up
 Vector primitives are incredibly powerful tools for speeding up computations. System programming languages are now incorporating support for them, whether through libraries or as first-class language features. This support gives developers the ability to leverage SIMD technology in a more portable manner, enabling us to write more efficient softwares.
 
-Hey, you made it to the end! You might want to check out the linear algebra library I recently wrote for Zig called [zig_matrix](https://github.com/AshishBhattarai/zig_matrix). I'm extensively using Zig's `@Vector` SIMD support in my implementation of some of the most widely known and utilized linear algebra operations. Feel free to email me with any feedback or questions!
+Hey, you made it to the end! You might want to check out a linear algebra library I recently wrote in Zig called [zig_matrix](https://github.com/AshishBhattarai/zig_matrix). I'm extensively using Zig's `@Vector` SIMD support in my implementation of some of the most widely known and utilized linear algebra operations. Feel free to email me with any feedback or questions!
 
 #### References
 - [Data Parallelism](https://en.wikipedia.org/wiki/Data_parallelism#Description)

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Static Variables in Rust
+title: Understanding Static Variables in Rust
 excerpt: "In this post I talk about static variables in Rust, compare them with static variables in C++. This post also tries to reason about the rules imposed by Rust on static variables and talks about why such rules are important."
 comments: false
 tags:
