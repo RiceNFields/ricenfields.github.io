@@ -222,8 +222,8 @@ At this point, it's pretty clear that SIMD can be effectively utilized to optimi
 
 Let's return to our string search example. When searching for a substring in a lengthy text, we can leverage SIMD vectors to compare multiple bytes simultaneously, allowing us to implement more efficient string searching algorithms.
 ```rust
-// Asuming the string is ASCII 8-bit character array
-fn contains_substr(text: &str, substr: &str) -> bool {
+// Asuming the string are ASCII 8-bit each
+pub fn contains_substr(text: &str, substr: &str) -> bool {
     if substr.is_empty() || substr.len() > text.len() {
         return false;
     } else {
@@ -241,7 +241,6 @@ fn contains_substr(text: &str, substr: &str) -> bool {
         let text_bytes = pad_text(text.as_bytes(), substr_len);
         let total_chunks = text_bytes.len() / 16;
         for (i, chunk) in text_bytes.chunks(16).enumerate().take(total_chunks) {
-
             // blocks to compare fingerprints with
             let first_block = u8x16::from_slice(chunk);
             // second_block start from start + offset where offset = substr_len - 1
@@ -251,23 +250,26 @@ fn contains_substr(text: &str, substr: &str) -> bool {
             let eq_a = first_block.simd_eq(first_fing);
             let eq_b = last_fing.simd_eq(second_block);
 
-            let mask = eq_a & eq_b;
+            let mut mask = eq_a & eq_b;
 
             // fingerprint match
-            if mask.any() {
+            while mask.any() {
                 // actual comparison, we can replace this with SIMD aswell but this should be
                 // trivial enough for complier optimization
-                let f = mask.first_set().unwrap() + (i * 16) + 1;
+                let set_index = mask.first_set().unwrap();
+                let f = set_index + (i * 16) + 1;
                 if text_bytes[f..f + substr_len - 2] == substr_bytes[1..substr_len - 1] {
                     return true;
                 }
                 // f - 1 starting index of substring in the text
+                mask.set(set_index, false);
             }
         }
         return false;
     }
 }
 
+// Padding could be done in a better way
 fn pad_text(data: &[u8], substr_len: usize) -> Vec<u8> {
     // Determine the padding needed
     let padding_needed = (16 - (data.len() % 16)) % 16 + substr_len - 1;
@@ -277,7 +279,7 @@ fn pad_text(data: &[u8], substr_len: usize) -> Vec<u8> {
     padded_data
 }
 ```
-[Example on Complier Explorer](https://godbolt.org/z/WfsbjooqT)
+[Example on Complier Explorer](https://godbolt.org/z/jMx5oYhM9)
 
 This sub-string search example is based on [SIMD-friendly Rabin-Karp modification](http://0x80.pl/articles/simd-friendly-karp-rabin.html). While I haven't benchmarked the algorithm myself, the referenced article does contain benchmarks demonstrating its effectiveness.
 
