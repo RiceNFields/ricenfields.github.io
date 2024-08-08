@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Sparse Set - stable pointers</title><!-- Begin Jekyll SEO tag v2.8.0 -->
+<meta name="generator" content="Jekyll v4.3.3" />
+<meta property="og:title" content="Sparse Set - stable pointers" />
+<meta name="author" content="RiceFields" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Continuing from my last article on sparse sets, this article goes into detail on how to implement a sparse set with stable pointers." />
+<meta property="og:description" content="Continuing from my last article on sparse sets, this article goes into detail on how to implement a sparse set with stable pointers." />
+<link rel="canonical" href="https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html" />
+<meta property="og:url" content="https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html" />
+<meta property="og:site_name" content="Rice Fields" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2024-08-16T00:00:00+07:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Sparse Set - stable pointers" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"RiceFields","url":"https://twitter.com/RiceDotMe"},"dateModified":"2024-08-16T00:00:00+07:00","datePublished":"2024-08-16T00:00:00+07:00","description":"Continuing from my last article on sparse sets, this article goes into detail on how to implement a sparse set with stable pointers.","headline":"Sparse Set - stable pointers","mainEntityOfPage":{"@type":"WebPage","@id":"https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html"},"publisher":{"@type":"Organization","logo":{"@type":"ImageObject","url":"https://ricefields.me/logo.png"},"name":"RiceFields"},"url":"https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link type="application/atom+xml" rel="alternate" href="https://ricefields.me/feed.xml" title="Rice Fields" /><link rel="shortcut icon" type="image/x-icon" href="" />
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head><body a="light">
+    <main class="page-content" aria-label="Content">
+      <div class="w">
+        <a href="/">..</a><article>
+  <p class="post-meta">
+    <time datetime="2024-08-16 00:00:00 +0700">2024-08-16</time>
+  </p>
+  
+  <h1>Sparse Set - stable pointers</h1>
+
+  <p>This is a continuation of my last article, <a href="/2024/08/15/sparse-set.html">‘Sparse Set - A Flexible, Cache-Friendly Data Structure’</a>.</p>
+
+<p>In the last article, we implemented a basic sparse set. Now, let’s improve our implementation by adding support for stable pointers. To achieve this, we can make a slight adjustment, instead of storing data in the dense array, we’ll store it directly in the sparse array.</p>
+
+<p>For this to work, we would need to change the structure of the sparse array from an array of integers to an array of pages. Each page will hold N dense indices along with N data items. The sparse index would then be a combination of the page index and the page offset (the index of the data within a specific page).</p>
+
+<p><img src="/assets/images/sparse-array/Stable_Pointer.webp" alt="Sparse Array Remove 2" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>As shown in the diagram, the sparse array is paged and directly holds the data. Since we allocate and deallocate one page at a time,  we avoid the need for complete reallocation each time we run out of capacity, as would be required with a dynamic array.</p>
+
+<p>You might have noticed that this implementation of a sparse set is not fully contiguous. However, this isn’t a significant concern in practical use if an optimal page size is chosen. Crossing OS page boundaries often results in a cache miss anyway, so we still benefit from spatial locality while maintaining stable pointers to the elements.</p>
+
+<h3 id="implementation">Implementation</h3>
+
+<p>Let’s start by redefining our sparse and dense arrays.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">struct</span> <span class="nc">SparsePage</span> <span class="p">{</span>
+    <span class="kt">size_t</span><span class="o">*</span> <span class="n">sparse</span><span class="p">;</span> <span class="c1">// array of dense indices</span>
+    <span class="n">T</span><span class="o">*</span> <span class="n">data</span><span class="p">;</span>        <span class="c1">// array of data</span>
+<span class="p">}</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">SparsePage</span><span class="o">&gt;</span> <span class="n">pages</span><span class="p">;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span> <span class="n">dense</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Now, we’ll need some logic to map the sparse index to the page index and page offset, which we can easily implement using bitwise operations.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">const</span> <span class="kt">unsigned</span> <span class="n">log2_page_size</span> <span class="o">=</span> <span class="mi">6</span><span class="p">;</span>
+<span class="k">const</span> <span class="kt">size_t</span> <span class="n">page_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">6</span><span class="p">;</span>
+
+<span class="kt">size_t</span> <span class="nf">toPageIndex</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">sparse_index</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">sparse_index</span> <span class="o">&gt;&gt;</span> <span class="n">log2_page_size</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">size_t</span> <span class="nf">toPageOffset</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">sparse_index</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">sparse_index</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">page_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>The page index refers to the index of the pages array, while the page offset is the index of the data &amp; sparse array within the corresponding page.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">auto</span> <span class="n">page_index</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">sparse_index</span><span class="p">);</span>
+<span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">sparse_index</span><span class="p">);</span>
+
+<span class="k">auto</span> <span class="n">data</span> <span class="o">=</span> <span class="n">pages</span><span class="p">[</span><span class="n">page_index</span><span class="p">].</span><span class="n">data</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
+<span class="k">auto</span> <span class="n">dense_index</span> <span class="o">=</span> <span class="n">pages</span><span class="p">[</span><span class="n">page_index</span><span class="p">].</span><span class="n">sparse</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
+</code></pre></div></div>
+
+<p>With this changes, we can move on to a proper implementation of a sparse set with stable pointer to its elements.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">const</span> <span class="kt">unsigned</span> <span class="n">LG2_PAGE_SIZE</span> <span class="o">=</span> <span class="mi">6</span><span class="p">;</span>
+<span class="k">const</span> <span class="kt">size_t</span> <span class="n">PAGE_SIZE</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">6</span><span class="p">;</span>
+
+<span class="kt">size_t</span> <span class="nf">toPageIndex</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">sparse_index</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">sparse_index</span> <span class="o">&gt;&gt;</span> <span class="n">LG2_PAGE_SIZE</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">size_t</span> <span class="nf">toPageOffset</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">sparse_index</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">sparse_index</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">PAGE_SIZE</span> <span class="o">-</span> <span class="mi">1</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="nc">T</span><span class="p">&gt;</span>
+<span class="k">struct</span> <span class="nc">SparseSet</span> <span class="p">{</span>
+    <span class="k">struct</span> <span class="nc">SparsePage</span> <span class="p">{</span>
+        <span class="kt">size_t</span><span class="o">*</span> <span class="n">sparse</span><span class="p">;</span>
+        <span class="n">T</span><span class="o">*</span> <span class="n">data</span><span class="p">;</span>
+    <span class="p">};</span>
+
+    <span class="k">struct</span> <span class="nc">SetEntry</span> <span class="p">{</span>
+        <span class="n">T</span> <span class="o">*</span><span class="n">data</span><span class="p">;</span>
+        <span class="kt">size_t</span> <span class="n">index</span><span class="p">;</span>
+    <span class="p">};</span>
+
+    <span class="kt">size_t</span> <span class="n">size</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="kt">size_t</span> <span class="n">max_sparse_idx</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="n">SparsePage</span><span class="o">&gt;&gt;</span> <span class="n">pages</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span> <span class="n">dense</span><span class="p">;</span>
+
+    <span class="o">~</span><span class="n">SparseSet</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">for</span><span class="p">(</span><span class="k">auto</span> <span class="n">page_opt</span> <span class="o">:</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">if</span><span class="p">(</span><span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="n">page_opt</span><span class="p">)</span> <span class="p">{</span>
+                <span class="k">delete</span><span class="p">[]</span> <span class="n">page</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">;</span>
+                <span class="k">delete</span><span class="p">[]</span> <span class="n">page</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="n">SetEntry</span> <span class="nf">add</span><span class="p">(</span><span class="n">T</span> <span class="n">item</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="c1">// try to reuse last freed index</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">.</span><span class="n">size</span><span class="p">())</span> <span class="p">{</span>
+            <span class="k">auto</span> <span class="n">sparse_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">];</span>
+            <span class="k">auto</span> <span class="n">page_idx</span><span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+            <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+            
+            <span class="k">if</span><span class="p">(</span><span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">])</span> <span class="p">{</span>
+                <span class="k">auto</span> <span class="n">data_ptr</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">page</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
+                <span class="o">*</span><span class="n">data_ptr</span> <span class="o">=</span> <span class="n">item</span><span class="p">;</span>
+                <span class="k">return</span> <span class="p">{</span> <span class="n">data_ptr</span><span class="p">,</span> <span class="n">sparse_idx</span> <span class="p">};</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="c1">// allocate new index</span>
+        <span class="k">auto</span> <span class="n">sparse_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">max_sparse_idx</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">max_sparse_idx</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="k">auto</span> <span class="n">page_idx</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+        <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+
+        <span class="n">ensurePageIndex</span><span class="p">(</span><span class="n">page_idx</span><span class="p">);</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+
+        <span class="k">auto</span> <span class="p">[</span><span class="n">sparse_ptr</span><span class="p">,</span> <span class="n">data_ptr</span><span class="p">]</span> <span class="o">=</span> <span class="n">getSparseEntryPtr</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+        <span class="o">*</span><span class="n">sparse_ptr</span> <span class="o">=</span> <span class="n">dense_idx</span><span class="p">;</span>
+        <span class="o">*</span><span class="n">data_ptr</span> <span class="o">=</span> <span class="n">item</span><span class="p">;</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="n">data_ptr</span><span class="p">,</span> <span class="n">sparse_idx</span><span class="p">};</span>
+    <span class="p">}</span>
+
+    <span class="kt">bool</span> <span class="nf">remove</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">contains</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">-=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="k">auto</span> <span class="p">[</span><span class="n">sparse_ptr</span><span class="p">,</span> <span class="n">data_ptr</span><span class="p">]</span> <span class="o">=</span> <span class="n">getSparseEntryPtr</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+
+        <span class="k">auto</span> <span class="n">end_dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">;</span>
+        <span class="k">auto</span> <span class="n">end_sparse_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">end_dense_idx</span><span class="p">];</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">end_sparse_ptr</span><span class="p">,</span> <span class="n">_</span><span class="p">]</span> <span class="o">=</span> <span class="n">getSparseEntryPtr</span><span class="p">(</span><span class="n">end_sparse_idx</span><span class="p">);</span>
+
+        <span class="c1">// swap remove</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="o">*</span><span class="n">sparse_ptr</span><span class="p">]</span> <span class="o">=</span> <span class="n">end_sparse_idx</span><span class="p">;</span>
+        <span class="o">*</span><span class="n">end_sparse_ptr</span> <span class="o">=</span> <span class="o">*</span><span class="n">sparse_ptr</span><span class="p">;</span>
+
+        <span class="c1">// update end dense idx for reuse</span>
+        <span class="o">*</span><span class="n">sparse_ptr</span> <span class="o">=</span> <span class="n">end_dense_idx</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">end_dense_idx</span><span class="p">]</span> <span class="o">=</span>  <span class="n">idx</span><span class="p">;</span>
+
+        <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="n">T</span><span class="o">*</span><span class="k">const</span><span class="o">&gt;</span> <span class="n">getPtr</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">contains</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span> <span class="k">return</span> <span class="n">std</span><span class="o">::</span><span class="n">nullopt</span><span class="p">;</span>
+
+        <span class="k">auto</span> <span class="n">page_idx</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+        <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="p">{</span> <span class="o">&amp;</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">].</span><span class="n">value</span><span class="p">().</span><span class="n">data</span><span class="p">[</span><span class="n">page_offset</span><span class="p">]</span> <span class="p">};</span>
+    <span class="p">}</span>
+
+    <span class="kt">bool</span> <span class="nf">contains</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+       <span class="k">auto</span> <span class="n">page_idx</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+       <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+
+       <span class="k">if</span><span class="p">(</span><span class="n">page_idx</span> <span class="o">&gt;=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">.</span><span class="n">size</span><span class="p">())</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+
+       <span class="k">if</span><span class="p">(</span><span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">])</span> <span class="p">{</span>
+           <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="n">page</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
+           <span class="k">auto</span> <span class="n">current_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">];</span>
+           <span class="k">return</span> <span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">&amp;&amp;</span> <span class="n">current_idx</span> <span class="o">==</span> <span class="n">dense_idx</span><span class="p">;</span>
+       <span class="p">}</span>
+        
+       <span class="k">return</span> <span class="nb">false</span><span class="p">;</span> 
+    <span class="p">}</span>
+
+    <span class="kt">void</span> <span class="nf">ensurePageIndex</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">page_index</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="n">pages_size</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">page_index</span> <span class="o">&gt;=</span> <span class="n">pages_size</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">.</span><span class="n">resize</span><span class="p">(</span><span class="n">page_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">nullopt</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_index</span><span class="p">])</span> <span class="p">{</span>
+            <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_index</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span> <span class="k">new</span> <span class="kt">size_t</span><span class="p">[</span><span class="n">PAGE_SIZE</span><span class="p">],</span> <span class="k">new</span> <span class="n">T</span><span class="p">[</span><span class="n">PAGE_SIZE</span><span class="p">]</span> <span class="p">};</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">*</span><span class="p">,</span> <span class="n">T</span><span class="o">*&gt;</span> <span class="n">getSparseEntryPtr</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="n">page_idx</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+        <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+        <span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">].</span><span class="n">value</span><span class="p">();</span>
+        <span class="k">return</span> <span class="p">{</span> <span class="o">&amp;</span><span class="n">page</span><span class="p">.</span><span class="n">sparse</span><span class="p">[</span><span class="n">page_offset</span><span class="p">],</span> <span class="o">&amp;</span><span class="n">page</span><span class="p">.</span><span class="n">data</span><span class="p">[</span><span class="n">page_offset</span><span class="p">]</span> <span class="p">};</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div></div>
+<p><a href="https://godbolt.org/z/YdKejvP9h">Complete Implementation on Compiler Explorer</a></p>
+
+<p>This implementation does not include iterator support, so it is up to the reader to implement their own iterator. Note: iterators can be implemented using the dense array.</p>
+
+</article>
+
+      </div>
+    </main>
+
+    
+  </body>
+</html>

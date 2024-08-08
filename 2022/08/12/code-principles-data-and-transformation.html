@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Code Principle - Data & Transformation</title><!-- Begin Jekyll SEO tag v2.8.0 -->
+<meta name="generator" content="Jekyll v4.3.3" />
+<meta property="og:title" content="Code Principle - Data &amp; Transformation" />
+<meta name="author" content="RiceFields" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="We discuss how thinking software design in terms of data and transformation helps improve overall software design." />
+<meta property="og:description" content="We discuss how thinking software design in terms of data and transformation helps improve overall software design." />
+<link rel="canonical" href="https://ricefields.me/2022/08/12/code-principles-data-and-transformation.html" />
+<meta property="og:url" content="https://ricefields.me/2022/08/12/code-principles-data-and-transformation.html" />
+<meta property="og:site_name" content="Rice Fields" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2022-08-12T00:00:00+07:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Code Principle - Data &amp; Transformation" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"RiceFields","url":"https://twitter.com/RiceDotMe"},"dateModified":"2022-08-12T00:00:00+07:00","datePublished":"2022-08-12T00:00:00+07:00","description":"We discuss how thinking software design in terms of data and transformation helps improve overall software design.","headline":"Code Principle - Data &amp; Transformation","mainEntityOfPage":{"@type":"WebPage","@id":"https://ricefields.me/2022/08/12/code-principles-data-and-transformation.html"},"publisher":{"@type":"Organization","logo":{"@type":"ImageObject","url":"https://ricefields.me/logo.png"},"name":"RiceFields"},"url":"https://ricefields.me/2022/08/12/code-principles-data-and-transformation.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link type="application/atom+xml" rel="alternate" href="https://ricefields.me/feed.xml" title="Rice Fields" /><link rel="shortcut icon" type="image/x-icon" href="" />
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head><body a="light">
+    <main class="page-content" aria-label="Content">
+      <div class="w">
+        <a href="/">..</a><article>
+  <p class="post-meta">
+    <time datetime="2022-08-12 00:00:00 +0700">2022-08-12</time>
+  </p>
+  
+  <h1>Code Principle - Data & Transformation</h1>
+
+  <p>Hello there. It’s been a while since my last post. There goes my goal of writing at least one article every month. This time it’s a lot more theoretical, as opposed to my previous pile of technical turd. So let us begin.</p>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>Most often we tend to only think about code in terms of logic or structure. When designing software, we often worry about languages and frameworks, data structure and algorithms, and classes and modules. We tend to forget about one of the most important aspects of software – <code class="language-plaintext highlighter-rouge">Data</code> and <code class="language-plaintext highlighter-rouge">Transformation</code>. Let us explore how taking <code class="language-plaintext highlighter-rouge">Data</code> and <code class="language-plaintext highlighter-rouge">Transformation</code> into account ultimately leads to a better software design.</p>
+
+<p>We shall begin by forming a concise yet flexible criteria for ‘good design’.</p>
+
+<h2 id="what-is-good-software-design-">What is Good Software Design ?</h2>
+
+<p>Software – as its name suggests – is meant to change and extend. It is ‘soft’, unlike hardware, which is generally meant to be fixed (hard). Software is expected to be susceptible to changes. When the requirements change, it falls upon us the developers to make sure that our software effectively adapts to the proposed changes. This often boils down to diving into the codebase and making required changes. Based on this, we can argue that good software design is design that is susceptible to change - i.e. easier to change.</p>
+
+<p>There are many patterns, principles and guidelines that help in designing software that is easier to change. Taking <code class="language-plaintext highlighter-rouge">Data Transformation</code> into account while designing is one such guideline that we’ll be exploring today.</p>
+
+<h2 id="data--transformation">Data &amp; Transformation</h2>
+
+<p><code class="language-plaintext highlighter-rouge">Data</code> is a vital part of any program. A program, in a basic sense, is a set of instructions that operates, communicates, processes, stores and/or presents data. When data flows through a program, it passes through operations that might introduce changes to the data in different ways, which can be defined as a <code class="language-plaintext highlighter-rouge">Transformation</code>. When a program operates on or changes a piece of data, we can basically say that the program transforms the data.</p>
+
+<p class="message">
+<i>Programming is About Code, But Programs Are About Data.</i>
+<br />
+- The Pragmatic Programmer
+</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// A basic example of data &amp; transformation</span>
+
+<span class="kd">const</span> <span class="nx">dataA</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1203</span><span class="p">,</span> <span class="mi">2123</span><span class="p">,</span> <span class="mi">2134</span><span class="p">,</span> <span class="mi">2323</span><span class="p">];</span>
+
+<span class="kd">const</span> <span class="nx">dataB</span> <span class="o">=</span> <span class="nx">dataA</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">x</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">x</span><span class="p">.</span><span class="nf">toString</span><span class="p">());</span>
+</code></pre></div></div>
+
+<p>Here, the array of numbers <code class="language-plaintext highlighter-rouge">dataA</code> is transformed into the array of strings <code class="language-plaintext highlighter-rouge">dataB</code> via <code class="language-plaintext highlighter-rouge">map</code>, which is a function that defines the transformation.</p>
+
+<h2 id="thinking-in-terms-of-transformation">Thinking in Terms of Transformation</h2>
+
+<p>We can start thinking of a program as a series of transformations. The data passes through one or more transformations, each one of which operates on the data in order to produce the desired output. Let’s make this concept clear with a quick example.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// A program that takes a user.csv file, parses it.</span>
+<span class="c1">// And sends notification to the user while logging failures if any.</span>
+
+<span class="kd">const</span> <span class="nx">users</span> <span class="o">=</span> <span class="nx">CSV</span><span class="p">.</span><span class="nf">parse</span><span class="p">(</span><span class="dl">"</span><span class="s2">user.csv</span><span class="dl">"</span><span class="p">);</span>
+<span class="c1">// filter users with valid email</span>
+<span class="kd">const</span> <span class="nx">usersWithValidEmail</span> <span class="o">=</span> <span class="nx">users</span><span class="p">.</span><span class="nf">filter</span><span class="p">((</span><span class="nx">u</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">u</span><span class="p">.</span><span class="nx">email</span><span class="p">);</span>
+<span class="c1">// extract email array</span>
+<span class="kd">const</span> <span class="nx">emails</span> <span class="o">=</span> <span class="nx">usersWithValidEmail</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">u</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">u</span><span class="p">.</span><span class="nx">email</span><span class="p">);</span>
+<span class="c1">// send notification</span>
+<span class="kd">const</span> <span class="nx">results</span> <span class="o">=</span> <span class="nf">sendNotification</span><span class="p">(</span><span class="nx">emails</span><span class="p">);</span>
+<span class="c1">// filter failure</span>
+<span class="kd">const</span> <span class="nx">failures</span> <span class="o">=</span> <span class="nx">result</span><span class="p">.</span><span class="nf">filter</span><span class="p">((</span><span class="nx">r</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="o">!</span><span class="nx">r</span><span class="p">.</span><span class="nx">success</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>The <code class="language-plaintext highlighter-rouge">user.csv</code> file here contains our data. Our program basically does 4 operations on this data:</p>
+
+<ol>
+  <li>Acquire through parse,</li>
+  <li>Filter valid emails,</li>
+  <li>Send notification to those emails,</li>
+  <li>Filter failures.</li>
+</ol>
+
+<p>To carry out these operations, we move our data through a series of transformations until we reach our end goal.</p>
+
+<p>This approach in programming – where we chain multiple transformations by passing one output as input to another is known as pipelining. Pipelining is mostly provided as a feature in functional languages, where a pipeline operator <code class="language-plaintext highlighter-rouge">|&gt;</code> automatically pipes output of one transformation as input to another.</p>
+
+<div class="language-elixir highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">CSV</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="s1">'user.csv'</span><span class="p">)</span>
+  <span class="o">|&gt;</span> <span class="no">Enum</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="o">&amp;</span> <span class="n">!is_nil</span><span class="p">(</span><span class="nv">&amp;1</span><span class="o">.</span><span class="n">email</span><span class="p">))</span>
+  <span class="o">|&gt;</span> <span class="no">Enum</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="o">&amp;</span> <span class="nv">&amp;1</span><span class="o">.</span><span class="n">email</span><span class="p">)</span>
+  <span class="o">|&gt;</span> <span class="n">send_notification</span><span class="p">()</span>
+  <span class="o">|&gt;</span> <span class="no">Enum</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="o">&amp;</span> <span class="n">!</span><span class="nv">&amp;1</span><span class="o">.</span><span class="n">success</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>This is same example but with the pipe operator. Another way to do this kind of chaining is with composition. Composition is somewhat similar to pipelining but true to its mathematical meaning.</p>
+
+<p>The goal is not to hoard state, but to pass them around and have our code conduct required operations, which in turn produce new state that’s essentially derived from the old state. Note that we try not to mutate state, but instead we derive new state from the previous one.</p>
+
+<p>It’s always a good idea to avoid mutation whenever possible. Avoiding mutation deserves its own separate article, but I digress.</p>
+
+<p>Since ’Thinking in terms of transformation’ is a mouthful, let’s just call this <code class="language-plaintext highlighter-rouge">Transformative Programming</code>.</p>
+
+<h2 id="transformative-programing-a-good-design-approach">Transformative Programing a Good Design Approach</h2>
+
+<p>As we have learned, good software design is design that’s easier to change, but we haven’t yet explored what makes bad software design.
+Or to rephrase, <em>what makes a software difficult to change?</em></p>
+
+<p><strong>Coupling.</strong></p>
+
+<p class="message">
+<i>Coupling ties things together, so that it's harder to change just one thing.</i>
+<br />
+- The pragmatic programming
+</p>
+
+<p><code class="language-plaintext highlighter-rouge">Transformative Programming</code> helps reduce coupling. Transformations are by design independent of each other. In fact, a transformation doesn’t even need to know about the existence of any other transformation. A transformation is only concerned with a specific operation that needs to be performed on its input.</p>
+
+<p>Besides reduced coupling, <code class="language-plaintext highlighter-rouge">Transformative Programming</code>  provides other goodies, such as increased code readability and better DRY (don’t repeat yourself) (don’t repeat yourself). As the program is divided into similar well-defined transformations, readability increases. The fact that the code is being broken into smaller transformations means that they can be effectively reused as needed.</p>
+
+<p>Let’s look at an example of a method <code class="language-plaintext highlighter-rouge">sendNotification</code>, which is responsible for sending notifications to a given user.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nf">sendNotification</span><span class="p">(</span><span class="nx">notification</span><span class="p">,</span> <span class="nx">user</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">results</span> <span class="o">=</span> <span class="p">[];</span>
+  <span class="kd">const</span> <span class="nx">devices</span> <span class="o">=</span> <span class="nx">user</span><span class="p">.</span><span class="nf">getDevices</span><span class="p">();</span>
+  <span class="c1">// loop through user devices</span>
+  <span class="k">for </span><span class="p">(</span><span class="nx">device</span> <span class="k">of</span> <span class="nx">devices</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">registrationId</span> <span class="o">=</span> <span class="nx">device</span><span class="p">.</span><span class="nx">registrationId</span><span class="p">;</span>
+    <span class="c1">// pre-process notification content</span>
+    <span class="kd">const</span> <span class="nx">body</span> <span class="o">=</span> <span class="nf">processTemplate</span><span class="p">(</span><span class="nx">notification</span><span class="p">.</span><span class="nx">body</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+    <span class="kd">const</span> <span class="nx">title</span> <span class="o">=</span> <span class="nf">processTemplate</span><span class="p">(</span><span class="nx">notification</span><span class="p">.</span><span class="nx">title</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+    <span class="c1">// queue notification</span>
+    <span class="kd">const</span> <span class="nx">result</span> <span class="o">=</span> <span class="nx">NotificationClientApi</span><span class="p">.</span><span class="nf">queueNotification</span><span class="p">(</span><span class="nx">registrationId</span><span class="p">,</span> <span class="p">{</span>
+      <span class="na">body</span><span class="p">:</span> <span class="nx">body</span><span class="p">,</span>
+      <span class="na">title</span><span class="p">:</span> <span class="nx">title</span><span class="p">,</span>
+    <span class="p">});</span>
+    <span class="c1">// store result</span>
+    <span class="nx">results</span><span class="p">.</span><span class="nf">push</span><span class="p">(</span><span class="nx">result</span><span class="p">);</span>
+  <span class="p">}</span>
+
+  <span class="k">return</span> <span class="nx">results</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now let’s write this code with a transformative approach.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// A function to pre-process notification content,</span>
+<span class="kd">function</span> <span class="nf">processNotificationContent</span><span class="p">(</span><span class="nx">notification</span><span class="p">,</span> <span class="nx">user</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">body</span> <span class="o">=</span> <span class="nf">processTemplate</span><span class="p">(</span><span class="nx">notification</span><span class="p">.</span><span class="nx">body</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+  <span class="kd">const</span> <span class="nx">title</span> <span class="o">=</span> <span class="nf">processTemplate</span><span class="p">(</span><span class="nx">notification</span><span class="p">.</span><span class="nx">title</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+
+  <span class="k">return</span> <span class="p">{</span> <span class="na">body</span><span class="p">:</span> <span class="nx">body</span><span class="p">,</span> <span class="na">title</span><span class="p">:</span> <span class="nx">title</span> <span class="p">};</span>
+<span class="p">}</span>
+
+<span class="c1">// A function that actually queues the notification, using some client library.</span>
+<span class="kd">function</span> <span class="nf">queueNotification</span><span class="p">(</span><span class="nx">registrationIds</span><span class="p">,</span> <span class="nx">notificationContent</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">registrationIds</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">regId</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">NotificationClientApi</span><span class="p">.</span><span class="nf">queueNotification</span><span class="p">(</span><span class="nx">regId</span><span class="p">,</span> <span class="nx">notificationContent</span><span class="p">)</span>
+  <span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nf">sendNotification</span><span class="p">(</span><span class="nx">notification</span><span class="p">,</span> <span class="nx">user</span><span class="p">)</span> <span class="p">{</span>
+  <span class="c1">// 1 - processNotificationContent</span>
+  <span class="kd">const</span> <span class="nx">notificationContent</span> <span class="o">=</span> <span class="nf">processNotificationContent</span><span class="p">(</span><span class="nx">notification</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+  <span class="c1">// 2 - get registrationIds</span>
+  <span class="kd">const</span> <span class="nx">registrationIds</span> <span class="o">=</span> <span class="nx">user</span><span class="p">.</span><span class="nf">getDevices</span><span class="p">().</span><span class="nf">map</span><span class="p">((</span><span class="nx">d</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">d</span><span class="p">.</span><span class="nx">registrationId</span><span class="p">);</span>
+  <span class="c1">// 3 - queue notification</span>
+  <span class="k">return</span> <span class="nf">queueNotification</span><span class="p">(</span><span class="nx">registrationIds</span><span class="p">,</span> <span class="nx">notificationContent</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>We can immediately notice that the code is a lot more readable, along with better separation of concern, as each transformation only applies a specific operation on the data. The code has become much easier to change.</p>
+
+<p>For example, if we add an additional templated field on the notification object, just by having a glance at the piece of code, we find that the only thing that needs to be updated is <code class="language-plaintext highlighter-rouge">processNotificationContent</code>.</p>
+
+<h2 id="transformative-programming-in-real-world">Transformative Programming in Real World</h2>
+
+<p>At this point, it’s possible to develop the impression that transformative programming is only applicable to functional programming. We will discover this to not be the case, since transformative programming can find its way into your code base and improve it regardless of the style you follow.</p>
+
+<p>In fact, you might already be using aspects of transformative programming, with utility functions like <code class="language-plaintext highlighter-rouge">map</code>, <code class="language-plaintext highlighter-rouge">reduce</code>, <code class="language-plaintext highlighter-rouge">filter</code> etc. that most programming languages now provide within their standard library.</p>
+
+<p>Let’s have a look at yet another contrived example:</p>
+
+<blockquote>
+  <p>Leys say, we have an e-commerce application, and need to calculate discounts for product orders in a shopping cart, based on a known fixed discount value. The discount might be applied to select orders or the whole cart (all orders).</p>
+</blockquote>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Example:1 - Normal OOP</span>
+<span class="kd">class</span> <span class="nc">Order</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical order contains */</span>
+
+  <span class="c1">// Applies discount and calculates final cost</span>
+  <span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// calculate new cost</span>
+    <span class="kd">const</span> <span class="nx">newCost</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">cost</span> <span class="o">-</span> <span class="nx">discountValue</span><span class="p">;</span>
+    <span class="c1">// check if its within range</span>
+    <span class="k">return</span> <span class="nx">newCost</span> <span class="o">&gt;</span> <span class="k">this</span><span class="p">.</span><span class="nx">lowestPossiblePrice</span>
+      <span class="p">?</span> <span class="nx">newCost</span>
+      <span class="p">:</span> <span class="k">this</span><span class="p">.</span><span class="nx">lowestPossiblePrice</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="c1">// Applies discount to the order, mutating the order</span>
+  <span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">costAfterDiscount</span> <span class="o">=</span> <span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">class</span> <span class="nc">Cart</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical order contains */</span>
+
+  <span class="c1">// Calculates total cost with discount applied to all orders in the card</span>
+  <span class="nf">calculateTotalCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">totalDiscount</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="c1">// calculate cost after the discount has been applied</span>
+    <span class="k">for </span><span class="p">(</span><span class="kd">const</span> <span class="nx">order</span> <span class="k">of</span> <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">totalDiscount</span> <span class="o">+=</span> <span class="nx">order</span><span class="p">.</span><span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">totalDiscount</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="c1">// Applies discount to each order in the cart, mutating the cart</span>
+  <span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">for </span><span class="p">(</span><span class="kd">const</span> <span class="nx">order</span> <span class="k">of</span> <span class="nx">orders</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">this</span><span class="p">.</span><span class="nx">order</span><span class="p">.</span><span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+
+  <span class="c1">// Applies discount to all orders in the cart-</span>
+  <span class="c1">// which match the given orderIds, mutating the cart</span>
+  <span class="nf">applyDiscountOnOrders</span><span class="p">(</span><span class="nx">orderIds</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">for </span><span class="p">(</span><span class="kd">const</span> <span class="nx">cartOrder</span> <span class="k">of</span> <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">for </span><span class="p">(</span><span class="kd">const</span> <span class="nx">applicableOrderId</span> <span class="k">of</span> <span class="nx">orderIds</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if </span><span class="p">(</span><span class="nx">cartOrder</span><span class="p">.</span><span class="nx">id</span> <span class="o">==</span> <span class="nx">applicableOrderId</span><span class="p">)</span> <span class="p">{</span>
+          <span class="nx">cartOrder</span><span class="p">.</span><span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+        <span class="p">}</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Here we have a basic cart-order system written with an Object-Oriented approach, which basically calculates or applies discount to the orders in cart. Everything is well-contained and the coupling is managed, but we could improve it with some <code class="language-plaintext highlighter-rouge">Transformative Programming</code>.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Example:2 - OOP with aspect of transformation</span>
+<span class="kd">class</span> <span class="nc">Order</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical order contains */</span>
+
+  <span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// we leverage Math.max instead of comparing values</span>
+    <span class="k">return</span> <span class="nb">Math</span><span class="p">.</span><span class="nf">max</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">cost</span> <span class="o">-</span> <span class="nx">discountValue</span><span class="p">,</span> <span class="k">this</span><span class="p">.</span><span class="nx">lowestPossiblePrice</span><span class="p">);</span>
+  <span class="p">}</span>
+
+  <span class="kd">function</span> <span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">costAfterDiscount</span> <span class="o">=</span> <span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">class</span> <span class="nc">Cart</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical cart contains */</span>
+
+  <span class="nf">calculateTotalCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// return this.orders.reduce((acc, curr) =&gt; acc + curr.calculateDiscount(discountValue), 0);</span>
+
+    <span class="c1">// 1 - we first transform orders into number (cost with discount)</span>
+    <span class="kd">const</span> <span class="nx">discounts</span><span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">order</span><span class="p">.</span><span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">))</span>
+    <span class="c1">// 2 - we transform the numbers using reduce to a single summed value</span>
+    <span class="k">return</span> <span class="nx">discounts</span><span class="p">.</span><span class="nf">reduce</span><span class="p">((</span><span class="nx">acc</span><span class="p">,</span> <span class="nx">curr</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">acc</span> <span class="o">+</span> <span class="nx">curr</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+  <span class="p">}</span>
+
+  <span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">forEach</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">order</span><span class="p">.</span><span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">));</span>
+  <span class="p">}</span>
+
+  <span class="nf">applyDiscountOnOrders</span><span class="p">(</span><span class="nx">orderIds</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// 1 - we transform cart orders into applicableOrders using filter + find</span>
+    <span class="kd">const</span> <span class="nx">applicableOrders</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">filter</span><span class="p">((</span><span class="nx">cartOrder</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">orderIds</span><span class="p">.</span><span class="nf">find</span><span class="p">((</span><span class="nx">applicableOrderId</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">cartOrder</span> <span class="o">==</span> <span class="nx">applicableOrderId</span><span class="p">));</span>
+    <span class="c1">// 2 - apply discount to each order, mutating in on the process</span>
+    <span class="nx">applicableOrders</span><span class="p">.</span><span class="nf">forEach</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">order</span><span class="p">.</span><span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">));</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now the code is much more readable. It can be further improved by minimizing mutations and switching to structured types, which in-turn makes our code reusable in a way that wasn’t possible before. Also, I recommend using something like <a href="https://lodash.com/">lodash</a> to compensate for lack of proper utilities in javascript.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cm">/**
+ * order
+ **/</span>
+<span class="kd">type</span> <span class="nx">Order</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical order contains */</span>
+<span class="p">};</span>
+
+<span class="c1">// Applies discount to the order, without mutating the order</span>
+<span class="kd">function</span> <span class="nf">orderWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">:</span> <span class="nx">Order</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">:</span> <span class="kr">number</span><span class="p">):</span> <span class="nx">Order</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">costAfterDiscount</span> <span class="o">=</span> <span class="nb">Math</span><span class="p">.</span><span class="nf">max</span><span class="p">(</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">price</span> <span class="o">-</span> <span class="nx">discountValue</span><span class="p">,</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">lowestPossibleCost</span>
+  <span class="p">);</span>
+
+  <span class="c1">// return a new order with discount applied</span>
+  <span class="k">return</span> <span class="nf">clone</span><span class="p">(</span><span class="k">this</span><span class="p">,</span> <span class="p">{</span>
+    <span class="na">costAfterDiscount</span><span class="p">:</span> <span class="nx">costAfterDiscount</span><span class="p">,</span>
+    <span class="na">discountValue</span><span class="p">:</span> <span class="nx">discountValue</span><span class="p">,</span>
+  <span class="p">});</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nf">orderCostAfterDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">):</span> <span class="kr">number</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">order</span><span class="p">.</span><span class="nx">costAfterDiscount</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="cm">/**
+ * Cart
+ **/</span>
+<span class="kd">type</span> <span class="nx">Cart</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical cart contains */</span>
+<span class="p">};</span>
+
+<span class="c1">// Calculate total cost including the discount</span>
+<span class="kd">function</span> <span class="nf">cartCalcTotalCostWithDiscount</span><span class="p">(</span>
+  <span class="nx">cart</span><span class="p">:</span> <span class="nx">Cart</span><span class="p">,</span>
+  <span class="nx">discountValue</span><span class="p">:</span> <span class="kr">number</span>
+<span class="p">):</span> <span class="kr">number</span> <span class="p">{</span>
+  <span class="c1">// Since orderWithDiscount doesn't modify the order, we can use to to calculate total</span>
+  <span class="kd">const</span> <span class="nx">orders</span> <span class="o">=</span> <span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nf">orderWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span>
+  <span class="p">);</span>
+  <span class="k">return</span> <span class="nx">orders</span><span class="p">.</span><span class="nf">reduce</span><span class="p">((</span><span class="nx">acc</span><span class="p">,</span> <span class="nx">curr</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">acc</span> <span class="o">+</span> <span class="nf">orderCostAfterDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">),</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// Applies discount to orders in a cart, without mutating the cart</span>
+<span class="kd">function</span> <span class="nf">cartWithDiscount</span><span class="p">(</span><span class="nx">cart</span><span class="p">:</span> <span class="nx">Cart</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">:</span> <span class="kr">number</span><span class="p">):</span> <span class="nx">Cart</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">orders</span> <span class="o">=</span> <span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nf">orderWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span>
+  <span class="p">);</span>
+
+  <span class="c1">// return a new cart with updated orders</span>
+  <span class="k">return</span> <span class="nf">clone</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="p">{</span> <span class="na">orders</span><span class="p">:</span> <span class="nx">orders</span> <span class="p">});</span>
+<span class="p">}</span>
+
+<span class="c1">// using lodash</span>
+<span class="c1">// Applies discount to orders that match the give order ids,</span>
+<span class="c1">// without mutating the supplied cart</span>
+<span class="kd">function</span> <span class="nf">cartWithDiscountOnOrders</span><span class="p">(</span>
+  <span class="nx">cart</span><span class="p">:</span> <span class="nx">Cart</span><span class="p">,</span>
+  <span class="nx">orderIds</span><span class="p">:</span> <span class="nx">OrderId</span><span class="p">[],</span>
+  <span class="nx">discountValue</span><span class="p">:</span> <span class="kr">number</span>
+<span class="p">):</span> <span class="nx">Cart</span> <span class="p">{</span>
+  <span class="c1">// 1 - filter applicable orders</span>
+  <span class="kd">const</span> <span class="nx">applicableOrders</span> <span class="o">=</span> <span class="nx">_</span><span class="p">.</span><span class="nf">intersectionBy</span><span class="p">(</span><span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">,</span> <span class="nx">orders</span><span class="p">,</span> <span class="dl">"</span><span class="s2">id</span><span class="dl">"</span><span class="p">);</span>
+  <span class="c1">// 2 - apply discount to applicable orders</span>
+  <span class="kd">const</span> <span class="nx">discountedOrders</span> <span class="o">=</span> <span class="nx">_</span><span class="p">.</span><span class="nf">map</span><span class="p">(</span><span class="nx">applicableOrders</span><span class="p">,</span> <span class="p">(</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nf">orderWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span>
+  <span class="p">);</span>
+  <span class="c1">// 3 - create a set of orders - applicable orders</span>
+  <span class="kd">const</span> <span class="nx">filteredOrders</span> <span class="o">=</span> <span class="nx">_</span><span class="p">.</span><span class="nf">difference</span><span class="p">(</span><span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">,</span> <span class="nx">applicableOrders</span><span class="p">);</span>
+
+  <span class="c1">// return new cart with updated orders</span>
+  <span class="k">return</span> <span class="nf">clone</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="p">{</span> <span class="na">orders</span><span class="p">:</span> <span class="nx">_</span><span class="p">.</span><span class="nf">concat</span><span class="p">(</span><span class="nx">filteredOrders</span><span class="p">,</span> <span class="nx">applicableOrders</span><span class="p">)</span> <span class="p">});</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Let’s add some additional functionality – like payment processing, and conditions for discounts to be applicable, which are just more transformations that contain steps required to process a payment.</p>
+
+<blockquote>
+  <p>The discount should be applied only if the total cost of the cart is greater than a certain threshold.</p>
+</blockquote>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nf">processPayment</span><span class="p">(</span><span class="nx">cart</span><span class="p">:</span> <span class="nx">Cart</span><span class="p">,</span> <span class="nx">payment</span><span class="p">:</span> <span class="nx">Options</span><span class="p">):</span> <span class="nx">Cart</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">totalCost</span> <span class="o">=</span> <span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nf">orderCostWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">))</span>
+  <span class="cm">/**
+   * Apply necessary transformations, call payment service APIs
+  **/</span>
+  <span class="kd">const</span> <span class="nx">paymentStatus</span> <span class="o">=</span> <span class="p">...;</span>
+  <span class="k">return</span> <span class="nf">clone</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="p">{</span><span class="na">paymentStatus</span><span class="p">:</span> <span class="nx">paymentStatus</span><span class="p">})</span>
+<span class="p">}</span>
+
+
+<span class="cm">/**
+ Apply discount and process payment
+**/</span>
+<span class="kd">const</span> <span class="nx">config</span> <span class="o">=</span> <span class="p">..;</span>
+<span class="kd">const</span> <span class="nx">paymentOptions</span> <span class="o">=</span> <span class="p">..;</span>
+
+<span class="c1">// 1 - calculate total cost</span>
+<span class="kd">const</span> <span class="nx">totalCost</span> <span class="o">=</span> <span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">reduce</span><span class="p">((</span><span class="nx">acc</span><span class="p">,</span> <span class="nx">curr</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">acc</span> <span class="o">+</span> <span class="nx">curr</span><span class="p">.</span><span class="nx">cost</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="c1">// 2 - check if discount is applicable</span>
+<span class="kd">const</span> <span class="nx">discountValue</span> <span class="o">=</span> <span class="p">(</span><span class="nx">totalCost</span> <span class="o">&gt;</span> <span class="nx">config</span><span class="p">.</span><span class="nx">discountThreshold</span><span class="p">)?</span> <span class="nx">config</span><span class="p">.</span><span class="nx">discountValue</span> <span class="p">:</span> <span class="mi">0</span>
+<span class="c1">// 3 - apply the discount</span>
+<span class="kd">const</span> <span class="nx">discountedCart</span> <span class="o">=</span> <span class="nf">cartWithDiscount</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="nx">constrainedDiscountValue</span><span class="p">);</span>
+<span class="c1">// 4- process payment</span>
+<span class="kd">const</span> <span class="nx">paymentProcessedCart</span> <span class="o">=</span> <span class="nf">processPayment</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="nx">paymentOptions</span><span class="p">);</span>
+<span class="cm">/**
+  Somewhere down the line, we save our most recent state
+ */</span>
+<span class="nx">db</span><span class="p">.</span><span class="nf">persist</span><span class="p">(</span><span class="nx">paymentProcessedCart</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Here, we are able to represent our business logic in terms of data and transformation, where each transformation is self-descriptive and isolated. There is no mutation; each transformation leads to a new state that could be utilized by the caller as they prefer, like when we use <code class="language-plaintext highlighter-rouge">orderWithDiscount</code> inside <code class="language-plaintext highlighter-rouge">cartCalcTotalCostWithDiscount</code> in order to calculate total discount value, while avoiding mutation of orders in the existing cart.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>We now understand that thinking in terms of data transformation leads to a code that is easier to change and understand. Even though transformative programming has its roots in functional programming we can easily adapt its aspects to any form programming approach.</p>
+
+<h2 id="references">References</h2>
+
+<ul>
+  <li><em>The Pragmatic Programmer by David Thomas &amp; Andrew Hunt</em></li>
+</ul>
+
+</article>
+
+      </div>
+    </main>
+
+    
+  </body>
+</html>

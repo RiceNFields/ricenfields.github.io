@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Brief Introduction to Physics Simulation</title><!-- Begin Jekyll SEO tag v2.8.0 -->
+<meta name="generator" content="Jekyll v4.3.3" />
+<meta property="og:title" content="Brief Introduction to Physics Simulation" />
+<meta name="author" content="RiceFields" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="In this article, we dive deep into writing a custom physics engine. It covers the various components of a physics engine’s architecture, with focus on the impulse solver." />
+<meta property="og:description" content="In this article, we dive deep into writing a custom physics engine. It covers the various components of a physics engine’s architecture, with focus on the impulse solver." />
+<link rel="canonical" href="https://ricefields.me/2024/10/11/intro-to-physics-simulation.html" />
+<meta property="og:url" content="https://ricefields.me/2024/10/11/intro-to-physics-simulation.html" />
+<meta property="og:site_name" content="Rice Fields" />
+<meta property="og:image" content="https://ricefields.me/assets/images/physics_2d/broadphase.gif" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2024-10-11T00:00:00+07:00" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta property="twitter:image" content="https://ricefields.me/assets/images/physics_2d/broadphase.gif" />
+<meta property="twitter:title" content="Brief Introduction to Physics Simulation" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"RiceFields","url":"https://twitter.com/RiceDotMe"},"dateModified":"2024-10-11T00:00:00+07:00","datePublished":"2024-10-11T00:00:00+07:00","description":"In this article, we dive deep into writing a custom physics engine. It covers the various components of a physics engine’s architecture, with focus on the impulse solver.","headline":"Brief Introduction to Physics Simulation","image":"https://ricefields.me/assets/images/physics_2d/broadphase.gif","mainEntityOfPage":{"@type":"WebPage","@id":"https://ricefields.me/2024/10/11/intro-to-physics-simulation.html"},"publisher":{"@type":"Organization","logo":{"@type":"ImageObject","url":"https://ricefields.me/logo.png"},"name":"RiceFields"},"url":"https://ricefields.me/2024/10/11/intro-to-physics-simulation.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link type="application/atom+xml" rel="alternate" href="https://ricefields.me/feed.xml" title="Rice Fields" /><link rel="shortcut icon" type="image/x-icon" href="" />
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head><body a="light">
+    <main class="page-content" aria-label="Content">
+      <div class="w">
+        <a href="/">..</a><article>
+  <p class="post-meta">
+    <time datetime="2024-10-11 00:00:00 +0700">2024-10-11</time>
+  </p>
+  
+  <h1>Brief Introduction to Physics Simulation</h1>
+
+  <iframe width="100%" height="350" src="https://www.youtube.com/embed/4F7Vmvz2isU?si=7BFC_W6h1E6jnmrF" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen=""></iframe>
+
+<p>I’ve been working on a custom physics engine for a while now. It’s been quite a journey, and I aim to document it through a series of blog posts. In this post we’ll mostly be talking about rigid body simulation, so for now, pretend that soft bodies don’t exist. First, we’ll be going through the basic architecture of a physics engine, focusing on a 2D rigid body simulation with code examples to keep everything neat and simple.</p>
+
+<h2 id="modeling-motion">Modeling motion</h2>
+<p>Let’s start with the most straightforward part of a physics simulation: modeling the motion of objects. For this, we’ll use the equation of motion and Newton’s second law.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>F = ma
+
+v = v + a * t
+v = v + F/m * t
+
+v is velocity
+a is acceleration
+t is time
+</code></pre></div></div>
+<p>This tells us that velocity of an object at a given time <em>t</em>. With this equation, we can compute velocity of our object given the force we want to apply and its mass. Now, to find the new position or displacement of the object, we can simply do the following:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>s = s + v * t;
+</code></pre></div></div>
+<p>This is also known as Euler’s integration <code class="language-plaintext highlighter-rouge">f(t + dt) = f(t) + f'(t) x dt</code>. It is simply an approximation of an object’s displacement over a small interval <em>t</em>. Mass is an object’s resistance to changes in its linear motion. We can compute mass using an object’s density and volume.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>v = width * height * depth
+mass = density * volume
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/6txeLu8h/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    Here is a code example for simulating this model: <a href="https://jsfiddle.net/6txeLu8h/" target="_blank" rel="noopener noreferrer">Link</a>
+</p>
+
+<h4 id="angular-motion-rotation">Angular motion (rotation)</h4>
+<p>The above equations of motion are enough for modeling linear motion, but ideally, in a simulation, we also need to model angular motion. When a force is applied to a body at a point that does not pass through its center of mass, the body will experience both linear motion and angular motion (rotation).</p>
+
+<p>Before going into modeling angular motion, let’s first talk about the <strong>mass moment of inertia</strong>. The mass moment of inertia is a measure of an object’s resistance to changes in its angular motion, which depends on both the mass and how the mass is distributed relative to the axis of rotation.</p>
+
+<p>Every unique shape has its own mass moment of inertia, which can be computed by combining the know mass moment of inertia of simple shapes. Deriving the mass moment of inertia of different shapes is not the goal of this post, so I will just link some resources for interested readers: <a href="https://www.youtube.com/watch?v=zmzUdFFCFkc">How to Find Mass Moment of Inertia</a></p>
+
+<p>The moment of inertia for commonly used shapes can be found here: <a href="https://en.wikipedia.org/wiki/List_of_moments_of_inertia">List of moments of inertia</a></p>
+
+<p>3D objects will have three axis of rotation, and thus we will have moment of inertia for each of these axes: Ixx, Iyy and Izz. This is generally represented using a 3x3 matrix called inertia tensor.</p>
+
+<p>Finally for we can model angular motion as,</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>w = w + a * t
+w = w + to/I * t
+
+w is angulary velocity
+a is angular acceleration
+t is delta time
+
+
+// new rotation
+r = r + w * t
+
+// wrap angle around [0, 2*PI] 
+if (r &lt; 0) r += 2 * Math.PI;
+if (r &gt;= 2 * Math.PI) r -= 2 * Math.PI;
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/ja5vgdzy/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    Updated example with Angular motion: <a href="https://jsfiddle.net/ja5vgdzy/" target="_blank" rel="noopener noreferrer">Link</a>
+</p>
+
+<h2 id="resolving-collision">Resolving collision</h2>
+<p>Our motion simulation works quite well, but it has a major issue: the bodies overlap upon collision. Ideally, rigid bodies (bodies that don’t deform under force) do not overlap on collision, they exert forces on each other and may lose some energy due to friction and restitution. To address this, we first need to detect collision and then resolve them. The entire process of detecting and resolving collision can be divided into four majour stages.</p>
+<ul>
+  <li>Broadphase</li>
+  <li>Narrowphase</li>
+  <li>Constraints</li>
+  <li>Solver</li>
+</ul>
+
+<h3 id="broadphase">Broadphase</h3>
+<p>In this stage, we compute a list of possibly colliding shape pairs. <em>Possibly colliding</em> means we don’t actually compute the precise contact points, rather determine whether a collision is possible. This can be done in a number of ways. The most widely used method involves using bounding volumes, usually an AABB (Axis Aligned Bounding Box) along with a space-partitioning structure, typically a binary tree BVH (Bounding Volume Hierarchy). Since directly computing contact between two shapes can be very expensive, the broadphase helps us avoid unnecessary computations for objects that obviously cannot collide. By using simple bounding volumes and specialized structures to keep track of those volumes broadphase checks become relatively inexpensive.</p>
+
+<p>For our simple JS example, we can get away with hash grids. A hash grid is a straightforward space-partitioning structure in which the space is divided into an <em>n × m</em> grid, and for each cell, we keep track of the objects that intersect with it. If you are interested in implementing BVH, you might want to check out <a href="https://box2d.org/files/ErinCatto_DynamicBVH_Full.pdf">ErinCatto’s DynamicBVH</a> slides.</p>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/1ecg3s4w/2/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/1ecg3s4w/2/" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h3 id="narrowphase">Narrowphase</h3>
+<p>After we get a list of possibly colliding pairs through broadphase, we need to perform the actual collision tests between the shapes. This stage is relatively straight forward for basic shapes like spheres, but for some slightly complex shapes such as boxes, convex hulls or meshes, we’ll need to employ a combination some well-documented algorithms like SAT (Separating Axis Theorem) and GJK (Gilbert–Johnson–Keerthi) with EPA (Expanding Polytope Algorithm).</p>
+
+<p>Narrowphase generates contact information such as contact points, contact normals, penetration depth, which we’ll need to resolve the contact.</p>
+
+<p>Resources for these algorithms:</p>
+<ul>
+  <li>GJK: <a href="https://caseymuratori.com/blog_0003">Implementing GJK</a></li>
+  <li>SAT: <a href="https://jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf">SAT for OOBB</a></li>
+</ul>
+
+<p>For our small JS example, we are only using circles, and computing contact between two circles is fairly trivial.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// C1 and C2 be two possibly colliding circles
+// r1 is radius of C1, r2 is radius of C2
+
+d = distance(C1, C2);
+
+if (d &gt; r1 + r2) =&gt; no collision
+
+normal = (C2 - C1) / d
+point = C1 + normal * r1
+penetration = (r1 + r2) - d;
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/4261dgzq/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/4261dgzq" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h3 id="constraints">Constraints</h3>
+<p>We can resolve the collision (separate the penetrating shapes) based on the information generated by the narrow phase. One way to solve collisions is through contact constraints. Constraints are limitations on the body’s degrees of freedom—a set of rules that dictate how a body can move. We can model constraints with an equation of the form C = 0, where C is our constraint that must equal zero; otherwise, the constraint fails. For example, if C represents the position of a body, C = 0 means that the position of the body should always remain at zero (essentially setting the position to zero every frame). Conversely, a constraint C greater than 0 indicates that C should be greater than zero.</p>
+
+<p>Constraints allow us to model rules that control the behavior of the physics simulation. They can also be used to simulate various things, such as collision responses, joints, and springs.</p>
+
+<p>For our example, let’s implement a simple ground constraint (objects shouldn’t fall off the ground). We can define our ground as y = 200, so our ground constraint will be y greater than 200.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>if((pos.y - radius) &lt;= 200) { // if the constraint is violated
+    const bias = (200 - (pos.y - radius));
+    pos.y += bias; // correct the positional error
+    velocity.y = 0; // remove y velocity  
+}
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/9p8t2mns/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/9p8t2mns/" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h3 id="solver">Solver</h3>
+<p>A solver is essentially a piece of logic that resolves constraints so that they remain valid. The two popular ways to solve constraints are by addressing positions (as in the example above) or solving velocities. While position constraints work, they are not particularly physically accurate.</p>
+
+<p>For our contacts, we will focus on velocity constraints. Velocity constraints are essentially the first derivative of the position constraint (i.e., C’ = 0). When solving velocity constraints, we will apply a small amount of impulses to the bodies until the constraint is satisfied (also known as impulse solvers).</p>
+
+<p>Since impulse solvers address continuous dynamics using discrete time steps, we need to solve them iteratively. Each iteration applies small impulses to correct the velocities of the bodies until the constraints are satisfied. As with most numerical methods, increasing the number of iterations generally leads to a more refined solution, although there are diminishing returns after a certain point. A physics simulation might involve multiple constraint solvers for different types of constraints. Before diving into contact constraints, let’s go through the formulas we’ll use to compute the impulses. We already have the direction for our impulse (the contact normal); now all we need to compute is the coefficient of impulse. (magnitude).</p>
+
+<p>Given a velocity constraint <code class="language-plaintext highlighter-rouge">Jv + b = 0</code>, we can compute the coefficient of impulse as:</p>
+
+<p><img src="/assets/images/physics_2d/impulse_eqns.webp" alt="Impulse Solver" class="post-image" /></p>
+
+<p><img src="/assets/images/physics_2d/generic_form.webp" alt="Velocity Constraints" class="post-image" /></p>
+
+<p>Since solving for velocities alone will not produce enough impulse to achieve the desired outcome, we can slightly boost the impulse using a bias <em>b</em> (e.g., penetration depth for contacts).</p>
+
+<h4 id="contact-constraint">Contact Constraint</h4>
+<p>Now, let’s model our contact in terms of velocity constraint: <code class="language-plaintext highlighter-rouge">(relative_velocity).n &gt;= 0</code> (relative velocity projected onto the contact normal).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>rv = V2 - V1 // relative velocity
+
+jv = dot(rv, n) // n is contact normal
+
+if(jv &lt; 0) =&gt; bodies moving closer to each other
+if(jv &gt; 0) =&gt; bodies moving apart from each other
+if(jv = 0) =&gt; no change in the movement
+
+b = -penetration / dt (computed in Narrowphase)
+
+l = -(jv + b) / eff_mass
+impulse = l * contact_normal
+</code></pre></div></div>
+
+<p>But how do we computed the effective mass?
+To find the effective mass, we can just plug <code class="language-plaintext highlighter-rouge">rv.n = 0</code> into the generic form <code class="language-plaintext highlighter-rouge">Jv + b = 0</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Jv = rv.n; // dot(rv, n)
+Jv = (V2 - V1).n;
+
+Jv = (v2 + w2 x c1).n - (v1 + w1 x c2).n  // x - cross product
+// c1 = (contact_point - pos_a)
+// c2 = (contact_point - pos_b)
+// v1, w1 = velocities of body a
+// v2, w2 = velocities of body b
+// v = [v1 w1 v2 w2]
+</code></pre></div></div>
+
+<p>With this, we can now solve for J, resulting in: <code class="language-plaintext highlighter-rouge">J = [-n -(c1 x n) n (c2 x n)]</code>. Finally, using the effective mass equation above we can compute our effective mass as:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>eff_mass = inv_m1 + dot(inv_I1 * c1n, c1n) + inv_m2 + dot(inv_I2 * c2n, c2n)
+
+c1n = c1 x n // x - cross product
+c2n = c2 x n
+</code></pre></div></div>
+
+<p>Applying the impulse:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>v += impulse / mass
+w += cross(point - centroid, impulse) / I
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/btg2f9sz/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/btg2f9sz/" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h4 id="clamping-impulse">Clamping impulse</h4>
+<p>When our impulse is negative, it will pull two bodies towards each other instead of pushing them apart, so we’ll need to clamp our impulse. We will go with clamping method <a href="https://box2d.org/files/ErinCatto_SequentialImpulses_GDC2006.pdf">suggested</a> by Erin Catto.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>l = -(jv + b) / eff_mass
+
+// clamping
+old_l = accumulated_l
+accumulated_l = max(0, old_l + l)
+l = accumulated_l - old_l
+</code></pre></div></div>
+
+<h4 id="bias-smoothing">Bias smoothing</h4>
+<p>If we add the bias <em>b</em> as it is, it will immediately correct the positional error induced by the collision. This is usually not desirable, as we would prefer our bodies to correct themselves smoothly over multiple frames. We can dampen our bias with a smoothing factor to achieve this. This is also known as Baumgarte stabilization.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bias = -0.3 * (penetration / dt); // 0.3 is our smoothing factor
+</code></pre></div></div>
+
+<h4 id="friction-constraint">Friction constraint</h4>
+<p>Solving for friction is similar to solving for contacts; instead of addressing the contact along the contact normal, we will resolve it along the tangent to the contact normal.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tangent = [normal.y, normal.x] // perpendicular to the normal
+
+rv = V2 - V1; // relative velocity
+
+jv = dot(rv, tangent)
+l = -jv / eff_mass
+impulse = l * tangent
+</code></pre></div></div>
+<p>Since we are only solving for friction, we won’t need any bias term. Additionally, the clamping logic for friction is slightly different:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>max_firction = friction * total_l // total_l is normal impulse
+f_old_l = f_total_l
+f_total_l = clamp(f_total_l + l, -max_friction, max_friction)
+f_l = f_toal_l - f_old_l;
+</code></pre></div></div>
+<iframe width="100%" height="300" src="//jsfiddle.net/ckubwa7e/embedded/result,js,html" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/ckubwa7e/" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h4 id="warm-starting">Warm starting</h4>
+<p>Warm starting is an optimization technique that can lead to better convergence for our solvers. This involves persisting the solver output (accumulated coefficient of impulse) across multiple frames. Warm starting can facilitate proper stable stacking of objects in the simulation.</p>
+
+<h4 id="wrap-up">Wrap up</h4>
+<p>This article has covered important steps for creating a simple physics simulation, starting with modeling linear and angular motion we explored broadphase and narrowphase collision detection, as well as methods for resolving collisions and handling friction. While these concepts provide a good starting point, there are many more techniques we can apply to enhance the simulation further. The same principles apply to 3D physics, with the addition of a third axis, making rotations a bit different since we’ll have three rotation axes to consider.</p>
+
+<h4 id="references">References</h4>
+<ul>
+  <li><a href="https://box2d.org/files/ErinCatto_ModelingAndSolvingConstraints_GDC2009.pdf">Modeling and Solving Constraints</a></li>
+  <li><a href="https://www.youtube.com/watch?v=SHinxAhv1ZE">Understanding Constraints</a></li>
+  <li><a href="https://box2d.org/files/ErinCatto_IterativeDynamics_GDC2005.pdf">Iterative Dynamics with Temporal Coherence</a></li>
+  <li><a href="https://allenchou.net/2013/12/game-physics-constraints-sequential-impulse/">Resolution – Constraints &amp; Sequential Impulse</a></li>
+</ul>
+
+
+</article>
+
+      </div>
+    </main>
+
+    
+  </body>
+</html>

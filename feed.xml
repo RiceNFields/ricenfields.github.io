@@ -1,0 +1,1541 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://ricefields.me/feed.xml" rel="self" type="application/atom+xml" /><link href="https://ricefields.me/" rel="alternate" type="text/html" /><updated>2024-10-13T13:20:06+07:00</updated><id>https://ricefields.me/feed.xml</id><title type="html">Rice Fields</title><subtitle>A blog mostly dedicated to computer science</subtitle><author><name>RiceFields</name></author><entry><title type="html">Brief Introduction to Physics Simulation</title><link href="https://ricefields.me/2024/10/11/intro-to-physics-simulation.html" rel="alternate" type="text/html" title="Brief Introduction to Physics Simulation" /><published>2024-10-11T00:00:00+07:00</published><updated>2024-10-11T00:00:00+07:00</updated><id>https://ricefields.me/2024/10/11/intro-to-physics-simulation</id><content type="html" xml:base="https://ricefields.me/2024/10/11/intro-to-physics-simulation.html"><![CDATA[<iframe width="100%" height="350" src="https://www.youtube.com/embed/4F7Vmvz2isU?si=7BFC_W6h1E6jnmrF" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen=""></iframe>
+
+<p>I’ve been working on a custom physics engine for a while now. It’s been quite a journey, and I aim to document it through a series of blog posts. In this post we’ll mostly be talking about rigid body simulation, so for now, pretend that soft bodies don’t exist. First, we’ll be going through the basic architecture of a physics engine, focusing on a 2D rigid body simulation with code examples to keep everything neat and simple.</p>
+
+<h2 id="modeling-motion">Modeling motion</h2>
+<p>Let’s start with the most straightforward part of a physics simulation: modeling the motion of objects. For this, we’ll use the equation of motion and Newton’s second law.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>F = ma
+
+v = v + a * t
+v = v + F/m * t
+
+v is velocity
+a is acceleration
+t is time
+</code></pre></div></div>
+<p>This tells us that velocity of an object at a given time <em>t</em>. With this equation, we can compute velocity of our object given the force we want to apply and its mass. Now, to find the new position or displacement of the object, we can simply do the following:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>s = s + v * t;
+</code></pre></div></div>
+<p>This is also known as Euler’s integration <code class="language-plaintext highlighter-rouge">f(t + dt) = f(t) + f'(t) x dt</code>. It is simply an approximation of an object’s displacement over a small interval <em>t</em>. Mass is an object’s resistance to changes in its linear motion. We can compute mass using an object’s density and volume.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>v = width * height * depth
+mass = density * volume
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/6txeLu8h/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    Here is a code example for simulating this model: <a href="https://jsfiddle.net/6txeLu8h/" target="_blank" rel="noopener noreferrer">Link</a>
+</p>
+
+<h4 id="angular-motion-rotation">Angular motion (rotation)</h4>
+<p>The above equations of motion are enough for modeling linear motion, but ideally, in a simulation, we also need to model angular motion. When a force is applied to a body at a point that does not pass through its center of mass, the body will experience both linear motion and angular motion (rotation).</p>
+
+<p>Before going into modeling angular motion, let’s first talk about the <strong>mass moment of inertia</strong>. The mass moment of inertia is a measure of an object’s resistance to changes in its angular motion, which depends on both the mass and how the mass is distributed relative to the axis of rotation.</p>
+
+<p>Every unique shape has its own mass moment of inertia, which can be computed by combining the know mass moment of inertia of simple shapes. Deriving the mass moment of inertia of different shapes is not the goal of this post, so I will just link some resources for interested readers: <a href="https://www.youtube.com/watch?v=zmzUdFFCFkc">How to Find Mass Moment of Inertia</a></p>
+
+<p>The moment of inertia for commonly used shapes can be found here: <a href="https://en.wikipedia.org/wiki/List_of_moments_of_inertia">List of moments of inertia</a></p>
+
+<p>3D objects will have three axis of rotation, and thus we will have moment of inertia for each of these axes: Ixx, Iyy and Izz. This is generally represented using a 3x3 matrix called inertia tensor.</p>
+
+<p>Finally for we can model angular motion as,</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>w = w + a * t
+w = w + to/I * t
+
+w is angulary velocity
+a is angular acceleration
+t is delta time
+
+
+// new rotation
+r = r + w * t
+
+// wrap angle around [0, 2*PI] 
+if (r &lt; 0) r += 2 * Math.PI;
+if (r &gt;= 2 * Math.PI) r -= 2 * Math.PI;
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/ja5vgdzy/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    Updated example with Angular motion: <a href="https://jsfiddle.net/ja5vgdzy/" target="_blank" rel="noopener noreferrer">Link</a>
+</p>
+
+<h2 id="resolving-collision">Resolving collision</h2>
+<p>Our motion simulation works quite well, but it has a major issue: the bodies overlap upon collision. Ideally, rigid bodies (bodies that don’t deform under force) do not overlap on collision, they exert forces on each other and may lose some energy due to friction and restitution. To address this, we first need to detect collision and then resolve them. The entire process of detecting and resolving collision can be divided into four majour stages.</p>
+<ul>
+  <li>Broadphase</li>
+  <li>Narrowphase</li>
+  <li>Constraints</li>
+  <li>Solver</li>
+</ul>
+
+<h3 id="broadphase">Broadphase</h3>
+<p>In this stage, we compute a list of possibly colliding shape pairs. <em>Possibly colliding</em> means we don’t actually compute the precise contact points, rather determine whether a collision is possible. This can be done in a number of ways. The most widely used method involves using bounding volumes, usually an AABB (Axis Aligned Bounding Box) along with a space-partitioning structure, typically a binary tree BVH (Bounding Volume Hierarchy). Since directly computing contact between two shapes can be very expensive, the broadphase helps us avoid unnecessary computations for objects that obviously cannot collide. By using simple bounding volumes and specialized structures to keep track of those volumes broadphase checks become relatively inexpensive.</p>
+
+<p>For our simple JS example, we can get away with hash grids. A hash grid is a straightforward space-partitioning structure in which the space is divided into an <em>n × m</em> grid, and for each cell, we keep track of the objects that intersect with it. If you are interested in implementing BVH, you might want to check out <a href="https://box2d.org/files/ErinCatto_DynamicBVH_Full.pdf">ErinCatto’s DynamicBVH</a> slides.</p>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/1ecg3s4w/2/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/1ecg3s4w/2/" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h3 id="narrowphase">Narrowphase</h3>
+<p>After we get a list of possibly colliding pairs through broadphase, we need to perform the actual collision tests between the shapes. This stage is relatively straight forward for basic shapes like spheres, but for some slightly complex shapes such as boxes, convex hulls or meshes, we’ll need to employ a combination some well-documented algorithms like SAT (Separating Axis Theorem) and GJK (Gilbert–Johnson–Keerthi) with EPA (Expanding Polytope Algorithm).</p>
+
+<p>Narrowphase generates contact information such as contact points, contact normals, penetration depth, which we’ll need to resolve the contact.</p>
+
+<p>Resources for these algorithms:</p>
+<ul>
+  <li>GJK: <a href="https://caseymuratori.com/blog_0003">Implementing GJK</a></li>
+  <li>SAT: <a href="https://jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf">SAT for OOBB</a></li>
+</ul>
+
+<p>For our small JS example, we are only using circles, and computing contact between two circles is fairly trivial.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// C1 and C2 be two possibly colliding circles
+// r1 is radius of C1, r2 is radius of C2
+
+d = distance(C1, C2);
+
+if (d &gt; r1 + r2) =&gt; no collision
+
+normal = (C2 - C1) / d
+point = C1 + normal * r1
+penetration = (r1 + r2) - d;
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/4261dgzq/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/4261dgzq" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h3 id="constraints">Constraints</h3>
+<p>We can resolve the collision (separate the penetrating shapes) based on the information generated by the narrow phase. One way to solve collisions is through contact constraints. Constraints are limitations on the body’s degrees of freedom—a set of rules that dictate how a body can move. We can model constraints with an equation of the form C = 0, where C is our constraint that must equal zero; otherwise, the constraint fails. For example, if C represents the position of a body, C = 0 means that the position of the body should always remain at zero (essentially setting the position to zero every frame). Conversely, a constraint C greater than 0 indicates that C should be greater than zero.</p>
+
+<p>Constraints allow us to model rules that control the behavior of the physics simulation. They can also be used to simulate various things, such as collision responses, joints, and springs.</p>
+
+<p>For our example, let’s implement a simple ground constraint (objects shouldn’t fall off the ground). We can define our ground as y = 200, so our ground constraint will be y greater than 200.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>if((pos.y - radius) &lt;= 200) { // if the constraint is violated
+    const bias = (200 - (pos.y - radius));
+    pos.y += bias; // correct the positional error
+    velocity.y = 0; // remove y velocity  
+}
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/9p8t2mns/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/9p8t2mns/" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h3 id="solver">Solver</h3>
+<p>A solver is essentially a piece of logic that resolves constraints so that they remain valid. The two popular ways to solve constraints are by addressing positions (as in the example above) or solving velocities. While position constraints work, they are not particularly physically accurate.</p>
+
+<p>For our contacts, we will focus on velocity constraints. Velocity constraints are essentially the first derivative of the position constraint (i.e., C’ = 0). When solving velocity constraints, we will apply a small amount of impulses to the bodies until the constraint is satisfied (also known as impulse solvers).</p>
+
+<p>Since impulse solvers address continuous dynamics using discrete time steps, we need to solve them iteratively. Each iteration applies small impulses to correct the velocities of the bodies until the constraints are satisfied. As with most numerical methods, increasing the number of iterations generally leads to a more refined solution, although there are diminishing returns after a certain point. A physics simulation might involve multiple constraint solvers for different types of constraints. Before diving into contact constraints, let’s go through the formulas we’ll use to compute the impulses. We already have the direction for our impulse (the contact normal); now all we need to compute is the coefficient of impulse. (magnitude).</p>
+
+<p>Given a velocity constraint <code class="language-plaintext highlighter-rouge">Jv + b = 0</code>, we can compute the coefficient of impulse as:</p>
+
+<p><img src="/assets/images/physics_2d/impulse_eqns.webp" alt="Impulse Solver" class="post-image" /></p>
+
+<p><img src="/assets/images/physics_2d/generic_form.webp" alt="Velocity Constraints" class="post-image" /></p>
+
+<p>Since solving for velocities alone will not produce enough impulse to achieve the desired outcome, we can slightly boost the impulse using a bias <em>b</em> (e.g., penetration depth for contacts).</p>
+
+<h4 id="contact-constraint">Contact Constraint</h4>
+<p>Now, let’s model our contact in terms of velocity constraint: <code class="language-plaintext highlighter-rouge">(relative_velocity).n &gt;= 0</code> (relative velocity projected onto the contact normal).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>rv = V2 - V1 // relative velocity
+
+jv = dot(rv, n) // n is contact normal
+
+if(jv &lt; 0) =&gt; bodies moving closer to each other
+if(jv &gt; 0) =&gt; bodies moving apart from each other
+if(jv = 0) =&gt; no change in the movement
+
+b = -penetration / dt (computed in Narrowphase)
+
+l = -(jv + b) / eff_mass
+impulse = l * contact_normal
+</code></pre></div></div>
+
+<p>But how do we computed the effective mass?
+To find the effective mass, we can just plug <code class="language-plaintext highlighter-rouge">rv.n = 0</code> into the generic form <code class="language-plaintext highlighter-rouge">Jv + b = 0</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Jv = rv.n; // dot(rv, n)
+Jv = (V2 - V1).n;
+
+Jv = (v2 + w2 x c1).n - (v1 + w1 x c2).n  // x - cross product
+// c1 = (contact_point - pos_a)
+// c2 = (contact_point - pos_b)
+// v1, w1 = velocities of body a
+// v2, w2 = velocities of body b
+// v = [v1 w1 v2 w2]
+</code></pre></div></div>
+
+<p>With this, we can now solve for J, resulting in: <code class="language-plaintext highlighter-rouge">J = [-n -(c1 x n) n (c2 x n)]</code>. Finally, using the effective mass equation above we can compute our effective mass as:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>eff_mass = inv_m1 + dot(inv_I1 * c1n, c1n) + inv_m2 + dot(inv_I2 * c2n, c2n)
+
+c1n = c1 x n // x - cross product
+c2n = c2 x n
+</code></pre></div></div>
+
+<p>Applying the impulse:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>v += impulse / mass
+w += cross(point - centroid, impulse) / I
+</code></pre></div></div>
+
+<iframe width="100%" height="300" src="//jsfiddle.net/btg2f9sz/embedded/result,js,html/" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/btg2f9sz/" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h4 id="clamping-impulse">Clamping impulse</h4>
+<p>When our impulse is negative, it will pull two bodies towards each other instead of pushing them apart, so we’ll need to clamp our impulse. We will go with clamping method <a href="https://box2d.org/files/ErinCatto_SequentialImpulses_GDC2006.pdf">suggested</a> by Erin Catto.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>l = -(jv + b) / eff_mass
+
+// clamping
+old_l = accumulated_l
+accumulated_l = max(0, old_l + l)
+l = accumulated_l - old_l
+</code></pre></div></div>
+
+<h4 id="bias-smoothing">Bias smoothing</h4>
+<p>If we add the bias <em>b</em> as it is, it will immediately correct the positional error induced by the collision. This is usually not desirable, as we would prefer our bodies to correct themselves smoothly over multiple frames. We can dampen our bias with a smoothing factor to achieve this. This is also known as Baumgarte stabilization.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bias = -0.3 * (penetration / dt); // 0.3 is our smoothing factor
+</code></pre></div></div>
+
+<h4 id="friction-constraint">Friction constraint</h4>
+<p>Solving for friction is similar to solving for contacts; instead of addressing the contact along the contact normal, we will resolve it along the tangent to the contact normal.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tangent = [normal.y, normal.x] // perpendicular to the normal
+
+rv = V2 - V1; // relative velocity
+
+jv = dot(rv, tangent)
+l = -jv / eff_mass
+impulse = l * tangent
+</code></pre></div></div>
+<p>Since we are only solving for friction, we won’t need any bias term. Additionally, the clamping logic for friction is slightly different:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>max_firction = friction * total_l // total_l is normal impulse
+f_old_l = f_total_l
+f_total_l = clamp(f_total_l + l, -max_friction, max_friction)
+f_l = f_toal_l - f_old_l;
+</code></pre></div></div>
+<iframe width="100%" height="300" src="//jsfiddle.net/ckubwa7e/embedded/result,js,html" frameborder="0" loading="lazy" allowtransparency="true" allowfullscreen="true"></iframe>
+<p style="text-align: center;">
+    <a href="https://jsfiddle.net/ckubwa7e/" target="_blank" rel="noopener noreferrer">Updated Example</a>
+</p>
+
+<h4 id="warm-starting">Warm starting</h4>
+<p>Warm starting is an optimization technique that can lead to better convergence for our solvers. This involves persisting the solver output (accumulated coefficient of impulse) across multiple frames. Warm starting can facilitate proper stable stacking of objects in the simulation.</p>
+
+<h4 id="wrap-up">Wrap up</h4>
+<p>This article has covered important steps for creating a simple physics simulation, starting with modeling linear and angular motion we explored broadphase and narrowphase collision detection, as well as methods for resolving collisions and handling friction. While these concepts provide a good starting point, there are many more techniques we can apply to enhance the simulation further. The same principles apply to 3D physics, with the addition of a third axis, making rotations a bit different since we’ll have three rotation axes to consider.</p>
+
+<h4 id="references">References</h4>
+<ul>
+  <li><a href="https://box2d.org/files/ErinCatto_ModelingAndSolvingConstraints_GDC2009.pdf">Modeling and Solving Constraints</a></li>
+  <li><a href="https://www.youtube.com/watch?v=SHinxAhv1ZE">Understanding Constraints</a></li>
+  <li><a href="https://box2d.org/files/ErinCatto_IterativeDynamics_GDC2005.pdf">Iterative Dynamics with Temporal Coherence</a></li>
+  <li><a href="https://allenchou.net/2013/12/game-physics-constraints-sequential-impulse/">Resolution – Constraints &amp; Sequential Impulse</a></li>
+</ul>]]></content><author><name>RiceFields</name></author><category term="code" /><summary type="html"><![CDATA[In this article, we dive deep into writing a custom physics engine. It covers the various components of a physics engine's architecture, with focus on the impulse solver.]]></summary><media:thumbnail xmlns:media="http://search.yahoo.com/mrss/" url="https://ricefields.me/assets/images/physics_2d/broadphase.gif" /><media:content medium="image" url="https://ricefields.me/assets/images/physics_2d/broadphase.gif" xmlns:media="http://search.yahoo.com/mrss/" /></entry><entry><title type="html">Sparse Set - stable pointers</title><link href="https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html" rel="alternate" type="text/html" title="Sparse Set - stable pointers" /><published>2024-08-16T00:00:00+07:00</published><updated>2024-08-16T00:00:00+07:00</updated><id>https://ricefields.me/2024/08/16/sparse-set-stable-pointer</id><content type="html" xml:base="https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html"><![CDATA[<p>This is a continuation of my last article, <a href="/2024/08/15/sparse-set.html">‘Sparse Set - A Flexible, Cache-Friendly Data Structure’</a>.</p>
+
+<p>In the last article, we implemented a basic sparse set. Now, let’s improve our implementation by adding support for stable pointers. To achieve this, we can make a slight adjustment, instead of storing data in the dense array, we’ll store it directly in the sparse array.</p>
+
+<p>For this to work, we would need to change the structure of the sparse array from an array of integers to an array of pages. Each page will hold N dense indices along with N data items. The sparse index would then be a combination of the page index and the page offset (the index of the data within a specific page).</p>
+
+<p><img src="/assets/images/sparse-array/Stable_Pointer.webp" alt="Sparse Array Remove 2" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>As shown in the diagram, the sparse array is paged and directly holds the data. Since we allocate and deallocate one page at a time,  we avoid the need for complete reallocation each time we run out of capacity, as would be required with a dynamic array.</p>
+
+<p>You might have noticed that this implementation of a sparse set is not fully contiguous. However, this isn’t a significant concern in practical use if an optimal page size is chosen. Crossing OS page boundaries often results in a cache miss anyway, so we still benefit from spatial locality while maintaining stable pointers to the elements.</p>
+
+<h3 id="implementation">Implementation</h3>
+
+<p>Let’s start by redefining our sparse and dense arrays.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">struct</span> <span class="nc">SparsePage</span> <span class="p">{</span>
+    <span class="kt">size_t</span><span class="o">*</span> <span class="n">sparse</span><span class="p">;</span> <span class="c1">// array of dense indices</span>
+    <span class="n">T</span><span class="o">*</span> <span class="n">data</span><span class="p">;</span>        <span class="c1">// array of data</span>
+<span class="p">}</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">SparsePage</span><span class="o">&gt;</span> <span class="n">pages</span><span class="p">;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span> <span class="n">dense</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Now, we’ll need some logic to map the sparse index to the page index and page offset, which we can easily implement using bitwise operations.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">const</span> <span class="kt">unsigned</span> <span class="n">log2_page_size</span> <span class="o">=</span> <span class="mi">6</span><span class="p">;</span>
+<span class="k">const</span> <span class="kt">size_t</span> <span class="n">page_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">6</span><span class="p">;</span>
+
+<span class="kt">size_t</span> <span class="nf">toPageIndex</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">sparse_index</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">sparse_index</span> <span class="o">&gt;&gt;</span> <span class="n">log2_page_size</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">size_t</span> <span class="nf">toPageOffset</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">sparse_index</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">sparse_index</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">page_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>The page index refers to the index of the pages array, while the page offset is the index of the data &amp; sparse array within the corresponding page.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">auto</span> <span class="n">page_index</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">sparse_index</span><span class="p">);</span>
+<span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">sparse_index</span><span class="p">);</span>
+
+<span class="k">auto</span> <span class="n">data</span> <span class="o">=</span> <span class="n">pages</span><span class="p">[</span><span class="n">page_index</span><span class="p">].</span><span class="n">data</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
+<span class="k">auto</span> <span class="n">dense_index</span> <span class="o">=</span> <span class="n">pages</span><span class="p">[</span><span class="n">page_index</span><span class="p">].</span><span class="n">sparse</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
+</code></pre></div></div>
+
+<p>With this changes, we can move on to a proper implementation of a sparse set with stable pointer to its elements.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">const</span> <span class="kt">unsigned</span> <span class="n">LG2_PAGE_SIZE</span> <span class="o">=</span> <span class="mi">6</span><span class="p">;</span>
+<span class="k">const</span> <span class="kt">size_t</span> <span class="n">PAGE_SIZE</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">6</span><span class="p">;</span>
+
+<span class="kt">size_t</span> <span class="nf">toPageIndex</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">sparse_index</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">sparse_index</span> <span class="o">&gt;&gt;</span> <span class="n">LG2_PAGE_SIZE</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">size_t</span> <span class="nf">toPageOffset</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">sparse_index</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">sparse_index</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">PAGE_SIZE</span> <span class="o">-</span> <span class="mi">1</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="nc">T</span><span class="p">&gt;</span>
+<span class="k">struct</span> <span class="nc">SparseSet</span> <span class="p">{</span>
+    <span class="k">struct</span> <span class="nc">SparsePage</span> <span class="p">{</span>
+        <span class="kt">size_t</span><span class="o">*</span> <span class="n">sparse</span><span class="p">;</span>
+        <span class="n">T</span><span class="o">*</span> <span class="n">data</span><span class="p">;</span>
+    <span class="p">};</span>
+
+    <span class="k">struct</span> <span class="nc">SetEntry</span> <span class="p">{</span>
+        <span class="n">T</span> <span class="o">*</span><span class="n">data</span><span class="p">;</span>
+        <span class="kt">size_t</span> <span class="n">index</span><span class="p">;</span>
+    <span class="p">};</span>
+
+    <span class="kt">size_t</span> <span class="n">size</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="kt">size_t</span> <span class="n">max_sparse_idx</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="n">SparsePage</span><span class="o">&gt;&gt;</span> <span class="n">pages</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span> <span class="n">dense</span><span class="p">;</span>
+
+    <span class="o">~</span><span class="n">SparseSet</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">for</span><span class="p">(</span><span class="k">auto</span> <span class="n">page_opt</span> <span class="o">:</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">if</span><span class="p">(</span><span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="n">page_opt</span><span class="p">)</span> <span class="p">{</span>
+                <span class="k">delete</span><span class="p">[]</span> <span class="n">page</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">;</span>
+                <span class="k">delete</span><span class="p">[]</span> <span class="n">page</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="n">SetEntry</span> <span class="nf">add</span><span class="p">(</span><span class="n">T</span> <span class="n">item</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="c1">// try to reuse last freed index</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">.</span><span class="n">size</span><span class="p">())</span> <span class="p">{</span>
+            <span class="k">auto</span> <span class="n">sparse_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">];</span>
+            <span class="k">auto</span> <span class="n">page_idx</span><span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+            <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+            
+            <span class="k">if</span><span class="p">(</span><span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">])</span> <span class="p">{</span>
+                <span class="k">auto</span> <span class="n">data_ptr</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">page</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
+                <span class="o">*</span><span class="n">data_ptr</span> <span class="o">=</span> <span class="n">item</span><span class="p">;</span>
+                <span class="k">return</span> <span class="p">{</span> <span class="n">data_ptr</span><span class="p">,</span> <span class="n">sparse_idx</span> <span class="p">};</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="c1">// allocate new index</span>
+        <span class="k">auto</span> <span class="n">sparse_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">max_sparse_idx</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">max_sparse_idx</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="k">auto</span> <span class="n">page_idx</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+        <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+
+        <span class="n">ensurePageIndex</span><span class="p">(</span><span class="n">page_idx</span><span class="p">);</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+
+        <span class="k">auto</span> <span class="p">[</span><span class="n">sparse_ptr</span><span class="p">,</span> <span class="n">data_ptr</span><span class="p">]</span> <span class="o">=</span> <span class="n">getSparseEntryPtr</span><span class="p">(</span><span class="n">sparse_idx</span><span class="p">);</span>
+        <span class="o">*</span><span class="n">sparse_ptr</span> <span class="o">=</span> <span class="n">dense_idx</span><span class="p">;</span>
+        <span class="o">*</span><span class="n">data_ptr</span> <span class="o">=</span> <span class="n">item</span><span class="p">;</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="n">data_ptr</span><span class="p">,</span> <span class="n">sparse_idx</span><span class="p">};</span>
+    <span class="p">}</span>
+
+    <span class="kt">bool</span> <span class="nf">remove</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">contains</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">-=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="k">auto</span> <span class="p">[</span><span class="n">sparse_ptr</span><span class="p">,</span> <span class="n">data_ptr</span><span class="p">]</span> <span class="o">=</span> <span class="n">getSparseEntryPtr</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+
+        <span class="k">auto</span> <span class="n">end_dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">;</span>
+        <span class="k">auto</span> <span class="n">end_sparse_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">end_dense_idx</span><span class="p">];</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">end_sparse_ptr</span><span class="p">,</span> <span class="n">_</span><span class="p">]</span> <span class="o">=</span> <span class="n">getSparseEntryPtr</span><span class="p">(</span><span class="n">end_sparse_idx</span><span class="p">);</span>
+
+        <span class="c1">// swap remove</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="o">*</span><span class="n">sparse_ptr</span><span class="p">]</span> <span class="o">=</span> <span class="n">end_sparse_idx</span><span class="p">;</span>
+        <span class="o">*</span><span class="n">end_sparse_ptr</span> <span class="o">=</span> <span class="o">*</span><span class="n">sparse_ptr</span><span class="p">;</span>
+
+        <span class="c1">// update end dense idx for reuse</span>
+        <span class="o">*</span><span class="n">sparse_ptr</span> <span class="o">=</span> <span class="n">end_dense_idx</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">end_dense_idx</span><span class="p">]</span> <span class="o">=</span>  <span class="n">idx</span><span class="p">;</span>
+
+        <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="n">T</span><span class="o">*</span><span class="k">const</span><span class="o">&gt;</span> <span class="n">getPtr</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">contains</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span> <span class="k">return</span> <span class="n">std</span><span class="o">::</span><span class="n">nullopt</span><span class="p">;</span>
+
+        <span class="k">auto</span> <span class="n">page_idx</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+        <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="p">{</span> <span class="o">&amp;</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">].</span><span class="n">value</span><span class="p">().</span><span class="n">data</span><span class="p">[</span><span class="n">page_offset</span><span class="p">]</span> <span class="p">};</span>
+    <span class="p">}</span>
+
+    <span class="kt">bool</span> <span class="nf">contains</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+       <span class="k">auto</span> <span class="n">page_idx</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+       <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+
+       <span class="k">if</span><span class="p">(</span><span class="n">page_idx</span> <span class="o">&gt;=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">.</span><span class="n">size</span><span class="p">())</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+
+       <span class="k">if</span><span class="p">(</span><span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">])</span> <span class="p">{</span>
+           <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="n">page</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
+           <span class="k">auto</span> <span class="n">current_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">];</span>
+           <span class="k">return</span> <span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">&amp;&amp;</span> <span class="n">current_idx</span> <span class="o">==</span> <span class="n">dense_idx</span><span class="p">;</span>
+       <span class="p">}</span>
+        
+       <span class="k">return</span> <span class="nb">false</span><span class="p">;</span> 
+    <span class="p">}</span>
+
+    <span class="kt">void</span> <span class="nf">ensurePageIndex</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">page_index</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="n">pages_size</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">page_index</span> <span class="o">&gt;=</span> <span class="n">pages_size</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">.</span><span class="n">resize</span><span class="p">(</span><span class="n">page_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">nullopt</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_index</span><span class="p">])</span> <span class="p">{</span>
+            <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_index</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span> <span class="k">new</span> <span class="kt">size_t</span><span class="p">[</span><span class="n">PAGE_SIZE</span><span class="p">],</span> <span class="k">new</span> <span class="n">T</span><span class="p">[</span><span class="n">PAGE_SIZE</span><span class="p">]</span> <span class="p">};</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">*</span><span class="p">,</span> <span class="n">T</span><span class="o">*&gt;</span> <span class="n">getSparseEntryPtr</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="n">page_idx</span> <span class="o">=</span> <span class="n">toPageIndex</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+        <span class="k">auto</span> <span class="n">page_offset</span> <span class="o">=</span> <span class="n">toPageOffset</span><span class="p">(</span><span class="n">idx</span><span class="p">);</span>
+        <span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">].</span><span class="n">value</span><span class="p">();</span>
+        <span class="k">return</span> <span class="p">{</span> <span class="o">&amp;</span><span class="n">page</span><span class="p">.</span><span class="n">sparse</span><span class="p">[</span><span class="n">page_offset</span><span class="p">],</span> <span class="o">&amp;</span><span class="n">page</span><span class="p">.</span><span class="n">data</span><span class="p">[</span><span class="n">page_offset</span><span class="p">]</span> <span class="p">};</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div></div>
+<p><a href="https://godbolt.org/z/YdKejvP9h">Complete Implementation on Compiler Explorer</a></p>
+
+<p>This implementation does not include iterator support, so it is up to the reader to implement their own iterator. Note: iterators can be implemented using the dense array.</p>]]></content><author><name>RiceFields</name></author><category term="code" /><category term="data-structure" /><summary type="html"><![CDATA[Continuing from my last article on sparse sets, this article goes into detail on how to implement a sparse set with stable pointers.]]></summary></entry><entry><title type="html">Sparse Set - flexible cache friendy data structure</title><link href="https://ricefields.me/2024/08/15/sparse-set.html" rel="alternate" type="text/html" title="Sparse Set - flexible cache friendy data structure" /><published>2024-08-15T00:00:00+07:00</published><updated>2024-08-15T00:00:00+07:00</updated><id>https://ricefields.me/2024/08/15/sparse-set</id><content type="html" xml:base="https://ricefields.me/2024/08/15/sparse-set.html"><![CDATA[<p>The first time I heard about a sparse data structure (specifically, sparse arrays) was in a computer science class. Back then, I didn’t think much of them and didn’t encounter them again until recent years. I’ve been working a lot with contiguous memory and dynamic arrays. While dynamic arrays are extremely cache-friendly and allow code to take advantage of the spatial locality of the CPU cache, operating on them often gets quite tricky. Lets jump into the problems with plain dynamic arrays first.</p>
+
+<h2 id="the-problem">The problem</h2>
+
+<p>Arrays have O(1) access time, but only when the indices are stable. Maintaining a stable index for an element in an array can be challenging, especially when we continuously add and remove elements. If we could maintain stable indices, we could use the index as a key or pointer to the element in the array without relying on other cache inefficient data structures like linked lists or hashmaps. This key would remain valid even when the length of the array changes.</p>
+
+<blockquote>
+  <p>Stable indices here mean that the index of an element in an array does not change when other elements are added or removed from the array.</p>
+</blockquote>
+
+<h2 id="sparse-set">Sparse Set</h2>
+<p>Sparse set solves the issue of stable indices with the help of two arrays: one for the indices (sparse) and the other for the actual data (dense). The basic idea is to use the index of the sparse array as a stable index; the element at that index in the sparse array holds the index of an element in the dense array where the actual data is stored.</p>
+
+<p><img src="/assets/images/sparse-array/sparse_array.webp" alt="Sparse Array" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>As shown in the diagram above, the sparse array stores indices pointing to elements in the dense array where the actual data is stored. With this mapping, we can easily update the dense array without losing index stability.</p>
+
+<p>If we were to remove the element with index 3 (sparse index), we could simply perform a swap-remove in the corresponding dense array and update the appropriate indices in the sparse array.</p>
+
+<p><img src="/assets/images/sparse-array/Sparse_Remove_0.webp" alt="Sparse Array Remove 0" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>After swapping the elements in the dense array, we would then update the corresponding indices in the sparse array. Sparse index 5 now points to dense index 1, and sparse index 3 points to dense index 3.</p>
+
+<p><img src="/assets/images/sparse-array/Sparse_Remove_1.webp" alt="Sparse Array Remove 1" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>Finally, just pop the element from the dense array.
+<img src="/assets/images/sparse-array/Sparse_Remove_2.webp" alt="Sparse Array Remove 2" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>This way, the actual index of the element, which is the sparse index, remains stable.</p>
+
+<h3 id="implementation">Implementation</h3>
+<p>Now that we have the basic idea behind sparse arrays, let’s look at a proper implementation.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="nc">T</span><span class="p">&gt;</span>
+<span class="k">struct</span> <span class="nc">SparseSet</span> <span class="p">{</span>
+    <span class="k">struct</span> <span class="nc">DenseElement</span> <span class="p">{</span>
+        <span class="kt">size_t</span> <span class="n">sparse_idx</span><span class="p">;</span>
+        <span class="n">T</span> <span class="n">value</span><span class="p">;</span>
+    <span class="p">};</span>
+
+    <span class="kt">size_t</span> <span class="n">size</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span> <span class="n">sparse</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">DenseElement</span><span class="o">&gt;</span> <span class="n">dense</span><span class="p">;</span>
+
+    <span class="kt">size_t</span> <span class="nf">add</span><span class="p">(</span><span class="n">T</span> <span class="n">item</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="c1">// try to reuse last freed index</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">.</span><span class="n">size</span><span class="p">())</span> <span class="p">{</span>
+           <span class="k">auto</span> <span class="n">dense_element</span> <span class="o">=</span> <span class="o">&amp;</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">];</span>
+           <span class="n">dense_element</span><span class="o">-&gt;</span><span class="n">value</span> <span class="o">=</span> <span class="n">item</span><span class="p">;</span>
+           <span class="k">return</span> <span class="n">dense_element</span><span class="o">-&gt;</span><span class="n">sparse_idx</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="c1">// allocate new index</span>
+        <span class="k">auto</span> <span class="n">sparse_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">.</span><span class="n">push_back</span><span class="p">({</span><span class="n">sparse_idx</span><span class="p">,</span> <span class="n">item</span><span class="p">});</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">dense_idx</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="n">sparse_idx</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="kt">bool</span> <span class="nf">remove</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">contains</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">-=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">idx</span><span class="p">];</span>
+        <span class="k">auto</span> <span class="n">end_dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">;</span>
+
+        <span class="c1">// swap remove</span>
+        <span class="k">auto</span> <span class="n">end_element</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">end_dense_idx</span><span class="p">];</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">end_element</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">end_element</span><span class="p">.</span><span class="n">sparse_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">dense_idx</span><span class="p">;</span>
+
+        <span class="c1">// update end dense idx for reuse</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">end_dense_idx</span><span class="p">].</span><span class="n">sparse_idx</span> <span class="o">=</span> <span class="n">idx</span><span class="p">;</span>
+        <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">end_dense_idx</span><span class="p">;</span>
+
+        <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="n">T</span><span class="o">*</span><span class="k">const</span><span class="o">&gt;</span> <span class="n">getPtr</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">contains</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span> <span class="k">return</span> <span class="n">std</span><span class="o">::</span><span class="n">nullopt</span><span class="p">;</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="o">&amp;</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">idx</span><span class="p">]].</span><span class="n">value</span><span class="p">};</span>
+    <span class="p">}</span>
+
+    <span class="kt">bool</span> <span class="nf">contains</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">idx</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">idx</span> <span class="o">&gt;=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">.</span><span class="n">size</span><span class="p">())</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+        <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">idx</span><span class="p">];</span>
+        <span class="k">auto</span> <span class="n">current_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">].</span><span class="n">sparse_idx</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">&amp;&amp;</span> <span class="n">idx</span> <span class="o">==</span> <span class="n">current_idx</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="k">typename</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">DenseElement</span><span class="o">&gt;::</span><span class="n">const_iterator</span><span class="p">,</span> 
+        <span class="k">typename</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">DenseElement</span><span class="o">&gt;::</span><span class="n">const_iterator</span><span class="o">&gt;</span>
+    <span class="n">iterator</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="n">start</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">.</span><span class="n">begin</span><span class="p">();</span>
+        <span class="k">auto</span> <span class="n">end</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">.</span><span class="n">begin</span><span class="p">()</span> <span class="o">+</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">;</span>
+        <span class="k">return</span> <span class="p">{</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="p">};</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div></div>
+<p><a href="https://godbolt.org/z/nTv49Yz3q">Complete Implementation on Compiler Explorer</a></p>
+
+<h2 id="stable-pointers">Stable Pointers</h2>
+<p>Stable indices are useful, but we can also achieve stable pointers for elements in the sparse set. The second part of this post goes into the details of implementing a sparse set with stable pointers. <a href="/2024/08/16/sparse-set-stable-pointer.html">Link to the post</a></p>
+
+<h3 id="wrap-up">Wrap-up</h3>
+<p>The sparse set is a useful data structure that combines the benefits of an array with stable indices and stable pointers (details in the next article). The major downside of a sparse set is that it uses more memory, as we maintain a sparse array, which isn’t particularly memory-efficient. Like most algorithms in computer science, this is a trade-off that can be really useful in many scenarios.</p>
+
+<h3 id="references">References</h3>
+<ul>
+  <li><a href="https://github.com/SanderMertens/flecs/blob/master/src/datastructures/sparse.c">Flecs</a></li>
+</ul>]]></content><author><name>RiceFields</name></author><category term="code" /><category term="data-structure" /><summary type="html"><![CDATA[Lately, I've been extensively using sparse data structure. This article serves as a brief introduction to sparse arrays and sets, along with some practical use cases.]]></summary></entry><entry><title type="html">SIMD - Vector Primitives and Operations</title><link href="https://ricefields.me/2024/06/09/vector-primitives.html" rel="alternate" type="text/html" title="SIMD - Vector Primitives and Operations" /><published>2024-06-09T00:00:00+07:00</published><updated>2024-06-09T00:00:00+07:00</updated><id>https://ricefields.me/2024/06/09/vector-primitives</id><content type="html" xml:base="https://ricefields.me/2024/06/09/vector-primitives.html"><![CDATA[<p>For quite a while, all major CPU architectures have included support for SIMD instruction sets. Consequently, system programming languages are now beginning to offer support for SIMD, either through libraries or as first-class language primitives. SIMD provides an optimization window for modern software through <a href="https://en.wikipedia.org/wiki/Data_parallelism#Description">data parallelism</a>, greatly accelerating computation. This article aims to provide a detailed overview of SIMD vector primitives and operations supported by modern languages, along with some real-world examples.</p>
+
+<h2 id="simd-single-instruction-multiple-data">SIMD (Single Instruction, Multiple Data)</h2>
+<p>SIMD stands for Single Instruction Multiple Data, which basically boils down to applying the same operation on multiple data or an array of primitives (such as integers, floats, or boolean masks). Let’s explore this concept deeper with an example.</p>
+
+<p>Consider a mathematical vector with four components. If we want to perform element-wise addition of these vectors, it requires four separate addition operations.</p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">v1</span><span class="p">:</span> <span class="p">[</span><span class="nb">f32</span><span class="p">;</span> <span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">];</span>
+<span class="k">let</span> <span class="n">v2</span><span class="p">:</span> <span class="p">[</span><span class="nb">f32</span><span class="p">;</span> <span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">];</span>
+
+<span class="k">let</span> <span class="n">add</span><span class="p">:</span> <span class="p">[</span><span class="nb">f32</span><span class="p">;</span> <span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">v1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+    <span class="n">v1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+    <span class="n">v1</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+    <span class="n">v1</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+<span class="p">];</span>
+</code></pre></div></div>
+<p>In the example, we’re performing element-wise addition on two float arrays. Imagine if there were native support for directly adding float arrays like this. That’s exactly what SIMD provides: the ability to execute a single operation, such as addition in our case, on multiple values, like two float arrays with 4 elements each.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="n">f32x4</span><span class="p">;</span>
+
+<span class="c1">//....</span>
+
+<span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">]);</span>
+
+<span class="k">let</span> <span class="n">add</span> <span class="o">=</span> <span class="n">v1</span> <span class="o">+</span> <span class="n">v2</span><span class="p">;</span>
+</code></pre></div></div>
+<p>This is a SIMD version of our example. In SIMD addition of two vectors, multiple operations are combined into a single one. There are no loops under the hood, as long as the target CPU supports SIMD. We’re essentially applying the same operation on multiple data in parallel, which is simply known as data-level parallelism. Instead of four separate add operations, we’re adding four numbers in parallel. This can significantly improve performance in software that deals with a lot of calculation or processing sequential data.</p>
+
+<h2 id="vector-registers">Vector Registers</h2>
+<p>SIMD operations are backed by vector registers, which are registers capable of holding 128, 256 or even 512 bits of data. We have the ability to perform operations on these registers, such as our example above, where we use two 128-bit registers to add two arrays of 32-bit floats.</p>
+
+<p><img src="/assets/images/simd/simd_reg.webp" alt="Simd Add Registers" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p><img src="/assets/images/simd/simd_add.webp" alt="Simd Add" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>Modern system programming languages provide support for these registers through vector primitives or structs such as <code class="language-plaintext highlighter-rouge">f32x4</code> in Rust, <code class="language-plaintext highlighter-rouge">@Vector</code> in Zig, and <code class="language-plaintext highlighter-rouge">std::native_simd&lt;float&gt;</code> in C++. 
+For documentation on SIMD support in each of these languages, you can follow the hyperlinks:
+<a href="https://doc.rust-lang.org/std/simd/index.html">Rust</a>, <a href="https://ziglang.org/documentation/master/#Vectors">Zig</a>, <a href="https://en.cppreference.com/w/cpp/experimental/simd">C++</a>.</p>
+
+<p>These vector registers also support 64-bit floating-point and integer data types, as well as boolean masks ranging from 8-bit to 64-bit per element.</p>
+
+<h4 id="cpu-support">CPU Support</h4>
+<p>Not all CPUs support vector registers, especially the larger ones like 512-bit. However, all widely used CPU architectures
+do support 128-bit vector registers, making it important for programmers to be aware of their availability and utilize them effectively. In this article we’ll mainly work with 128-bit register as they are widely supported. Here are the documentations for 128-bit SIMD support on various architectures:</p>
+<ul>
+  <li><a href="https://en.wikipedia.org/wiki/SSE4">x86</a></li>
+  <li><a href="https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)">Arm</a></li>
+  <li><a href="https://en.wikipedia.org/wiki/AltiVec">PowerPc</a></li>
+  <li><a href="https://en.wikipedia.org/wiki/MIPS_architecture">MIPS</a></li>
+</ul>
+
+<h2 id="vector-operations">Vector Operations</h2>
+<p>Let’s go through some of the fundamental operations you can perform with these vector registers:</p>
+
+<h4 id="arithmetic">Arithmetic</h4>
+<p>These don’t need any explanation; they are just your old regular arithmetic operations. The only difference being, in the case of SIMD vectors, they’re element-wise operations. So, if you multiply, add, divide, or subtract two SIMD vectors, the operations will be done element-wise. Here’s a simple diagram for multiplication; all other operations work the same way.</p>
+
+<p><img src="/assets/images/simd/simd_mul.webp" alt="Simd Mul" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<h4 id="comparison-logical-and-masks">Comparison, Logical and Masks</h4>
+<p>Like regular primitives, SIMD vectors also support logical (AND, OR, NOT, XOR) and comparison (EQUAL, LESS, GREATER) operations. However, they work slightly differently because we’re operating on multiple values simultaneously.</p>
+
+<p>The comparison operation returns a packed bitmask, where four 32-bit masks are packed into a single 128-bit SIMD vector. Each mask contains all 1’s for true and all 0’s for false. For example, SIMD A &gt; B essentially boils down to the following pseudo code. Additionally, it’s worth noting that these masks are stored and represented as a set of integers (four 32-bit ints in our example).</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">]</span>
+<span class="n">B</span> <span class="o">=</span> <span class="p">[</span><span class="n">b0</span><span class="p">,</span> <span class="n">b1</span><span class="p">,</span> <span class="n">b2</span><span class="p">,</span> <span class="n">b3</span><span class="p">]</span>
+
+<span class="c1">// M = A &gt; B</span>
+<span class="n">Mask</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="n">a0</span> <span class="o">&gt;</span> <span class="n">b0</span><span class="p">)</span> <span class="o">?</span> <span class="mh">0xFFFFFFFF</span> <span class="o">:</span> <span class="mh">0x00000000</span><span class="p">,</span>
+    <span class="p">(</span><span class="n">a1</span> <span class="o">&gt;</span> <span class="n">b1</span><span class="p">)</span> <span class="o">?</span> <span class="mh">0xFFFFFFFF</span> <span class="o">:</span> <span class="mh">0x00000000</span><span class="p">,</span>
+    <span class="p">(</span><span class="n">a2</span> <span class="o">&gt;</span> <span class="n">b2</span><span class="p">)</span> <span class="o">?</span> <span class="mh">0xFFFFFFFF</span> <span class="o">:</span> <span class="mh">0x00000000</span><span class="p">,</span>
+    <span class="p">(</span><span class="n">a3</span> <span class="o">&gt;</span> <span class="n">b3</span><span class="p">)</span> <span class="o">?</span> <span class="mh">0xFFFFFFFF</span> <span class="o">:</span> <span class="mh">0x00000000</span><span class="p">,</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p>The logical operations like arithmetic are applied element wise.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">]</span>
+<span class="n">B</span> <span class="o">=</span> <span class="p">[</span><span class="n">b0</span><span class="p">,</span> <span class="n">b1</span><span class="p">,</span> <span class="n">b2</span><span class="p">,</span> <span class="n">b3</span><span class="p">]</span>
+
+<span class="c1">// M = B | A</span>
+<span class="n">M</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">a0</span> <span class="o">|</span> <span class="n">b0</span><span class="p">,</span>    
+    <span class="n">a1</span> <span class="o">|</span> <span class="n">b1</span><span class="p">,</span>
+    <span class="n">a2</span> <span class="o">|</span> <span class="n">b2</span><span class="p">,</span>
+    <span class="n">a3</span> <span class="o">|</span> <span class="n">b3</span><span class="p">,</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<h4 id="data-movement">Data Movement</h4>
+<p>Data movement involves swizzling or shuffling, where you can create a new SIMD vector by combining two input vectors based on a user-defined mask. For example:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">]</span>
+<span class="n">B</span> <span class="o">=</span> <span class="p">[</span><span class="n">b0</span><span class="p">,</span> <span class="n">b1</span><span class="p">,</span> <span class="n">b2</span><span class="p">,</span> <span class="n">b3</span><span class="p">]</span>
+
+<span class="n">R</span> <span class="o">=</span> <span class="n">shuffle</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">])</span> <span class="c1">// M = [a0, a1, b2, b3]</span>
+</code></pre></div></div>
+<p>Here, we are copying the first two elements (a0, a1) from A and the last two elements (b2, b3) from B based on our mask <code class="language-plaintext highlighter-rouge">[0, 1, 6, 7]</code>. The mask is represented by an array of indices from the concatenation of A and B, i.e. <code class="language-plaintext highlighter-rouge">[a0, a1, a2, a3, b0, b1, b2, b3]</code>.</p>
+
+<p>The representation of the mask differs based on the programming language and its SIMD library. Rust uses concatenated array indices for masks, while Zig uses positive indices to select elements from the first input and negative indices to select elements from the second input.</p>
+
+<p>Rust example, rust uses the term swizzle for data movement operation. <a href="https://doc.rust-lang.org/nightly/std/simd/macro.simd_swizzle.html">Rust Docs</a></p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">]);</span>
+
+<span class="k">let</span> <span class="n">m</span><span class="p">:</span> <span class="n">f32x4</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">]);</span> <span class="c1">// m = [1.0, 2.0, 7.0, 8.0]</span>
+</code></pre></div></div>
+
+<p>Zig example, zig uses negative indices for masks. <a href="https://ziglang.org/documentation/master/#shuffle">Zig Docs</a></p>
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">const</span> <span class="n">v1</span> <span class="o">=</span> <span class="nb">@Vector</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="kt">f32</span><span class="p">){</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">};</span>
+<span class="k">const</span> <span class="n">v2</span> <span class="o">=</span> <span class="nb">@Vector</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="kt">f32</span><span class="p">){</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">};</span>
+
+<span class="k">const</span> <span class="n">m</span> <span class="o">=</span> <span class="nb">@shuffle</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="p">[</span><span class="mi">_</span><span class="p">]</span><span class="kt">i32</span><span class="p">{</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="o">-</span><span class="mi">4</span><span class="p">});</span> <span class="c">// m = [1.0, 2.0, 7.0, 6.0]</span>
+</code></pre></div></div>
+
+<p>You can also rearrange the order of elements in a SIMD vector using shuffle/swizzle operations.</p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="n">f32x4</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="n">simd_swizzle</span><span class="p">;</span>
+
+<span class="c1">// ...</span>
+
+<span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v1</span><span class="p">,</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]);</span> <span class="c1">// v2 = [4.0, 1.0, 3.0, 2.0]</span>
+</code></pre></div></div>
+
+<h4 id="reduction">Reduction</h4>
+<p>Until now, all the vector operations we explored were mostly element-wise operations on two input vectors, known as vertical operations. Another type of operation we can perform is among the elements in the same SIMD vector, known as horizontal operation. For example, adding all elements to a single 32-bit float value, i.e., reducing to a single value.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">];</span>
+
+<span class="n">r</span> <span class="o">=</span> <span class="n">a0</span> <span class="o">+</span> <span class="n">a1</span> <span class="o">+</span> <span class="n">a2</span> <span class="o">+</span> <span class="n">a3</span> <span class="p">;</span> <span class="c1">// reduce sum</span>
+</code></pre></div></div>
+
+<p>All three languages offer macros or helper functions for reduction.</p>
+
+<p>Rust example, <a href="https://doc.rust-lang.org/std/simd/num/trait.SimdFloat.html#tymethod.reduce_sum">Rust Docs</a></p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="n">f32x4</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="nn">num</span><span class="p">::</span><span class="n">SimdFloat</span><span class="p">;</span>
+
+<span class="c1">//....</span>
+
+<span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">sum</span> <span class="o">=</span> <span class="n">v1</span><span class="nf">.reduce_sum</span><span class="p">();</span> <span class="c1">// 10</span>
+</code></pre></div></div>
+
+<p>Zig example, <a href="https://ziglang.org/documentation/master/#reduce">Zig Docs</a></p>
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="k">const</span> <span class="n">v1</span> <span class="o">=</span> <span class="nb">@Vector</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="kt">f32</span><span class="p">){</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">};</span>
+<span class="k">const</span> <span class="n">sum</span> <span class="o">=</span> <span class="n">@reduce</span><span class="p">(.</span><span class="py">Add</span><span class="p">,</span> <span class="n">v1</span><span class="p">);</span> <span class="c">// 10</span>
+</code></pre></div></div>
+
+<h2 id="practical-examples">Practical Examples</h2>
+<p>Now, let’s explore some practical use cases for these SIMD vectors and operations we’ve just covered.</p>
+
+<h4 id="dot-product">Dot Product</h4>
+<p>The dot product is a mathematical operation on vectors that involves element-wise multiplication followed by the summation of the elements of the multiplication result.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">3.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">4.0</span><span class="p">]);</span>
+
+<span class="k">let</span> <span class="n">dot_product</span> <span class="o">=</span> <span class="p">(</span><span class="n">v1</span> <span class="o">*</span> <span class="n">v2</span><span class="p">)</span><span class="nf">.reduce_sum</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>Similarly, SIMD can be applied to other linear algebra operations such as matrix multiplication, transposition, decomposition, etc. Vectors and matrices are widely used in computer graphics and image processing, making SIMD essential for accelerating computation in these areas</p>
+
+<h4 id="sarrus-rule">Sarrus Rule</h4>
+<p>Sarrus rule is another mathematical operation often used to calculate the determinant of a 3x3 matrix or the cross product of two 3D vectors.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// 3x3 matrix, assuming the 4th component to be zero</span>
+<span class="k">fn</span> <span class="nf">determinant</span><span class="p">(</span><span class="n">mat</span><span class="p">:</span> <span class="p">[</span><span class="n">f32x4</span><span class="p">;</span> <span class="mi">3</span><span class="p">])</span> <span class="k">-&gt;</span> <span class="nb">f32</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">m0</span> <span class="o">=</span> <span class="n">mat</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="o">*</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="o">*</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+
+    <span class="k">let</span> <span class="n">m1</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="o">*</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="o">*</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">m0</span> <span class="o">-</span> <span class="n">m1</span><span class="p">)</span><span class="nf">.reduce_sum</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c1">// Assuming the 4th element to be 0 for both a and b</span>
+<span class="k">fn</span> <span class="nf">cross</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">f32x4</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">f32x4</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="n">f32x4</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">temp0</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+    <span class="k">let</span> <span class="n">temp1</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+    <span class="k">let</span> <span class="n">temp2</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+    <span class="k">let</span> <span class="n">temp3</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">temp0</span> <span class="o">*</span> <span class="n">temp3</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">temp2</span> <span class="o">*</span> <span class="n">temp1</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p><a href="https://godbolt.org/z/nn66s6zr7">Example on Compiler Explorer</a></p>
+
+<h4 id="string-search">String Search</h4>
+<p>At this point, it’s pretty clear that SIMD can be effectively utilized to optimize mathematical calculations. But what about other use cases? Another area where SIMD has proven its effectiveness is in parsing data. SIMD can significantly speed up something like JSON parsing. Take a look at the benchmark on <a href="https://github.com/simdjson/simdjson">simdjson</a>.</p>
+
+<p>Let’s return to our string search example. When searching for a substring in a lengthy text, we can leverage SIMD vectors to compare multiple bytes simultaneously, allowing us to implement more efficient string searching algorithms.</p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Assuming the string are ASCII 8-bit each</span>
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">contains_substr</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">,</span> <span class="n">substr</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">bool</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="n">substr</span><span class="nf">.is_empty</span><span class="p">()</span> <span class="p">||</span> <span class="n">substr</span><span class="nf">.len</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">text</span><span class="nf">.len</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="k">false</span><span class="p">;</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="n">substr_bytes</span> <span class="o">=</span> <span class="n">substr</span><span class="nf">.as_bytes</span><span class="p">();</span>
+        <span class="k">let</span> <span class="n">substr_len</span> <span class="o">=</span> <span class="n">substr_bytes</span><span class="nf">.len</span><span class="p">();</span>
+
+        <span class="k">let</span> <span class="n">first_char</span> <span class="o">=</span> <span class="n">substr_bytes</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+        <span class="k">let</span> <span class="n">last_char</span> <span class="o">=</span> <span class="n">substr_bytes</span><span class="p">[</span><span class="n">substr_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">];</span>
+
+        <span class="c1">// fingerprint from first and last character of the substring</span>
+        <span class="k">let</span> <span class="n">first_fing</span> <span class="o">=</span> <span class="nn">u8x16</span><span class="p">::</span><span class="nf">splat</span><span class="p">(</span><span class="n">first_char</span><span class="nf">.try_into</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">());</span>
+        <span class="k">let</span> <span class="n">last_fing</span> <span class="o">=</span> <span class="nn">u8x16</span><span class="p">::</span><span class="nf">splat</span><span class="p">(</span><span class="n">last_char</span><span class="nf">.try_into</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">());</span>
+
+        <span class="c1">// create 16-byte chunks for figerprint checks</span>
+        <span class="k">let</span> <span class="n">text_bytes</span> <span class="o">=</span> <span class="nf">pad_text</span><span class="p">(</span><span class="n">text</span><span class="nf">.as_bytes</span><span class="p">(),</span> <span class="n">substr_len</span><span class="p">);</span>
+        <span class="k">let</span> <span class="n">total_chunks</span> <span class="o">=</span> <span class="n">text_bytes</span><span class="nf">.len</span><span class="p">()</span> <span class="o">/</span> <span class="mi">16</span><span class="p">;</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">chunk</span><span class="p">)</span> <span class="k">in</span> <span class="n">text_bytes</span><span class="nf">.chunks</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span><span class="nf">.enumerate</span><span class="p">()</span><span class="nf">.take</span><span class="p">(</span><span class="n">total_chunks</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// blocks to compare fingerprints with</span>
+            <span class="k">let</span> <span class="n">first_block</span> <span class="o">=</span> <span class="nn">u8x16</span><span class="p">::</span><span class="nf">from_slice</span><span class="p">(</span><span class="n">chunk</span><span class="p">);</span>
+            <span class="c1">// second_block start from start + offset where offset = substr_len - 1</span>
+            <span class="k">let</span> <span class="n">sb_start</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="mi">16</span><span class="p">)</span> <span class="o">+</span> <span class="n">substr_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+            <span class="k">let</span> <span class="n">second_block</span> <span class="o">=</span> <span class="nn">u8x16</span><span class="p">::</span><span class="nf">from_slice</span><span class="p">(</span><span class="o">&amp;</span><span class="n">text_bytes</span><span class="p">[</span><span class="n">sb_start</span><span class="o">..</span><span class="n">sb_start</span> <span class="o">+</span> <span class="mi">16</span><span class="p">]);</span>
+
+            <span class="k">let</span> <span class="n">eq_a</span> <span class="o">=</span> <span class="n">first_block</span><span class="nf">.simd_eq</span><span class="p">(</span><span class="n">first_fing</span><span class="p">);</span>
+            <span class="k">let</span> <span class="n">eq_b</span> <span class="o">=</span> <span class="n">last_fing</span><span class="nf">.simd_eq</span><span class="p">(</span><span class="n">second_block</span><span class="p">);</span>
+
+            <span class="k">let</span> <span class="k">mut</span> <span class="n">mask</span> <span class="o">=</span> <span class="n">eq_a</span> <span class="o">&amp;</span> <span class="n">eq_b</span><span class="p">;</span>
+
+            <span class="c1">// fingerprint match</span>
+            <span class="k">while</span> <span class="n">mask</span><span class="nf">.any</span><span class="p">()</span> <span class="p">{</span>
+                <span class="c1">// actual comparison, we can replace this with SIMD aswell but this should be</span>
+                <span class="c1">// trivial enough for compiler optimization</span>
+                <span class="k">let</span> <span class="n">set_index</span> <span class="o">=</span> <span class="n">mask</span><span class="nf">.first_set</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">();</span>
+                <span class="k">let</span> <span class="n">f</span> <span class="o">=</span> <span class="n">set_index</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="mi">16</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">;</span>
+                <span class="k">if</span> <span class="n">text_bytes</span><span class="p">[</span><span class="n">f</span><span class="o">..</span><span class="n">f</span> <span class="o">+</span> <span class="n">substr_len</span> <span class="o">-</span> <span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">substr_bytes</span><span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="n">substr_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="p">{</span>
+                    <span class="k">return</span> <span class="k">true</span><span class="p">;</span>
+                <span class="p">}</span>
+                <span class="c1">// f - 1 starting index of substring in the text</span>
+                <span class="n">mask</span><span class="nf">.set</span><span class="p">(</span><span class="n">set_index</span><span class="p">,</span> <span class="k">false</span><span class="p">);</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="k">false</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Padding could be done in a better way</span>
+<span class="k">fn</span> <span class="nf">pad_text</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[</span><span class="nb">u8</span><span class="p">],</span> <span class="n">substr_len</span><span class="p">:</span> <span class="nb">usize</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">u8</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="c1">// Determine the padding needed</span>
+    <span class="k">let</span> <span class="n">padding_needed</span> <span class="o">=</span> <span class="p">(</span><span class="mi">16</span> <span class="o">-</span> <span class="p">(</span><span class="n">data</span><span class="nf">.len</span><span class="p">()</span> <span class="o">%</span> <span class="mi">16</span><span class="p">))</span> <span class="o">%</span> <span class="mi">16</span> <span class="o">+</span> <span class="n">substr_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">padded_data</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">with_capacity</span><span class="p">(</span><span class="n">data</span><span class="nf">.len</span><span class="p">()</span> <span class="o">+</span> <span class="n">padding_needed</span><span class="p">);</span>
+    <span class="n">padded_data</span><span class="nf">.extend_from_slice</span><span class="p">(</span><span class="n">data</span><span class="p">);</span>
+    <span class="n">padded_data</span><span class="nf">.resize</span><span class="p">(</span><span class="n">data</span><span class="nf">.len</span><span class="p">()</span> <span class="o">+</span> <span class="n">padding_needed</span><span class="p">,</span> <span class="sc">b'\0'</span><span class="p">);</span>
+    <span class="n">padded_data</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p><a href="https://godbolt.org/z/jMx5oYhM9">Example on Compiler Explorer</a></p>
+
+<p>This sub-string search example is based on <a href="http://0x80.pl/articles/simd-friendly-karp-rabin.html">SIMD-friendly Rabin-Karp modification</a>. While I haven’t benchmarked the algorithm myself, the referenced article does contain benchmarks demonstrating its effectiveness.</p>
+
+<h3 id="auto-vectorization">Auto Vectorization</h3>
+<p>Auto vectorization is a compiler optimization technique where the compiler automatically vectorizes array operations to some extent. While it’s generally beneficial to let the compiler handle most optimization tasks, auto vectorization doesn’t always yield the desired outcome, particularly in cases where vectorization is nontrivial. In such situations, you may need to manually write your own vectorized code. This is where the support for SIMD in modern languages truly shines, offering developers the flexibility to optimize performance-critical code.</p>
+
+<h3 id="wrap-up">Wrap-up</h3>
+<p>Vector primitives are incredibly powerful tools for speeding up computations. System programming languages are now incorporating support for them, whether through libraries or as first-class language features. This support gives developers the ability to leverage SIMD technology in a more portable manner, enabling us to write more efficient software.</p>
+
+<p>Hey, you made it to the end! You might want to check out a linear algebra library I recently wrote in Zig called <a href="https://github.com/AshishBhattarai/zig_matrix">zig_matrix</a>. I’m extensively using Zig’s <code class="language-plaintext highlighter-rouge">@Vector</code> SIMD support in my implementation of some of the most widely known and utilized linear algebra operations. Feel free to email me with any feedback or questions!</p>
+
+<h4 id="references">References</h4>
+<ul>
+  <li><a href="https://en.wikipedia.org/wiki/Data_parallelism#Description">Data Parallelism</a></li>
+  <li><a href="https://en.wikibooks.org/wiki/X86_Assembly/SSE">x86 Assembly/SSE</a></li>
+  <li><a href="https://developer.arm.com/documentation/dht0002/a/Introducing-NEON/What-is-SIMD-/ARM-SIMD-instructions">ARM SIMD instructions</a></li>
+  <li><a href="https://www.youtube.com/watch?v=wlvKAT7SZIQ">Parsing JSON Really Quickly: Lessons Learned</a></li>
+  <li><a href="http://0x80.pl/articles/simd-friendly-karp-rabin.html">SIMD-friendly Rabin-Karp modification</a></li>
+</ul>]]></content><author><name>RiceFields</name></author><category term="code" /><summary type="html"><![CDATA[Brief overview on SIMD (Single Instruction, Multiple Data) vector primitives and operations supported by modern languages.]]></summary></entry><entry><title type="html">Two-Level Segregated Fit Memory Allocator</title><link href="https://ricefields.me/2024/04/20/tlsf-allocator.html" rel="alternate" type="text/html" title="Two-Level Segregated Fit Memory Allocator" /><published>2024-04-20T00:00:00+07:00</published><updated>2024-04-20T00:00:00+07:00</updated><id>https://ricefields.me/2024/04/20/tlsf-allocator</id><content type="html" xml:base="https://ricefields.me/2024/04/20/tlsf-allocator.html"><![CDATA[<p>Last week, I decided to develop a simple memory allocator for Vulkan. Initially, it was meant to be a quick combination of a pool allocator and a free-list allocator (with the free-list backed by pools of memory). However, I was not satisfied with it and started looking into improving my allocator which led me to a paper titled “<a href="http://www.gii.upv.es/tlsf/files/papers/ecrts04_tlsf.pdf">TLSF: a New Dynamic Memory Allocator for Real-Time Systems</a>”. So here we are.</p>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>The most basic data structure for memory allocation is free-list. As the name suggests, it involves maintaining a linked list of free memory blocks. Depending on our strategy (first-fit, best-fit, good-fit), we traverse through the linked list to find a suitable block for a memory allocation. While being very simple to implement, the approach often results in an O(N) runtime. While this might not be a problem for most applications, it’s a different story for embedded or real-time systems.</p>
+
+<h2 id="two-level-segregated-fit-tlsf">Two-Level Segregated Fit (TLSF)</h2>
+
+<p>The TLSF memory allocation algorithm provides O(1) memory allocation and deallocation with a good-fit strategy. TSFL utilizes a two-level segregated data structure to optimize lookup on the freelist. Like many data structures in computer science, fast lookup is achieved through binning or bucketing.</p>
+
+<p>The basic idea is to have M blocks or bins, each of which is further divided in N blocks or sub-bins. These sub-bins then store our free lists.
+<img src="/assets/images/tlsf/TLSF_Basic.webp" alt="Two Level Bin" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>To determine the bin sizes, we follow a specific approach. The idea is to arrange first bins in intervals of power of two (2<sup>bin_idx</sup>) and then each bin is further divided into M subbins, with the subbin division being linear.</p>
+
+<p><img src="/assets/images/tlsf/TLSF_Basic_b.webp" alt="Two Level Bin Division" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>For example, free memory blocks with size in the range [2<sup>4</sup>, 2<sup>5</sup>) will be placed inside bin with index 4. To determine the subbin index, we can take the block size, subtract it with 2<sup>bin_idx</sup> and divide it by <em>bin_interval / subbin_count</em>.</p>
+
+<p>Given the memory size, we can compute bin and subbin index with:</p>
+
+<p><img src="/assets/images/tlsf/Binning_Formula.webp" alt="Bin Formulas" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>With this, we know where to store or find memory blocks given their size. But how do we determine which bin and subbins have free memory to allocate from? For this, we can use a lookup table that maps the bin index to a boolean value indicating whether it’s free or not. This can be easily implemented as a bitset. We’ll need a bitset for the first-level bin and bitsets for each subbin under each bin.</p>
+
+<p><img src="/assets/images/tlsf/TLSF_Diagram.webp" alt="TSFL Diagram" style="display:block; margin-left:auto; margin-right:auto" />
+With this our datastructure is nearly complete. All that remains is to slove a minor edge case.</p>
+
+<p>In the first-level bin, the starting bin intervals are very small (2<sup>0</sup>, 2<sup>1</sup>, 2<sup>2</sup>, …). Since they can only be used to bin a very small set of sizes, we can just opimize them by making first bin with index 0 a linear or fixed-size bin and using it for all small allocations.
+<img src="/assets/images/tlsf/TLSF_Linear_Bin.webp" alt="TSFL Linear Bin" style="display:block; margin-left:auto; margin-right:auto" />
+As you can see, the first bin looks different. Now, the first bin has a fixed size 2<sup>7</sup>, and our second bin starts from 2<sup>8</sup> interval. This also implies that we’ll need to subtract our bin index with this fixed size in order to compute actual bin index.</p>
+
+<p>First, we define our fixed linear interval (Linear), and then we compute our bin and sub-bin index accordingly.
+<img src="/assets/images/tlsf/Binning_Formula_Final.webp" alt="Final Bin Formulas" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>This ensures that all blocks in the range [2^0, 2^7) exist in bin 0, and the range [2^7, …) starts from bin 1. With these adjustments, we are ready to implement our own TLSF allocator.</p>
+
+<h2 id="implementation-details">Implementation Details</h2>
+
+<p>Some Zig code snippets for implementing a TLSF allocator. Let’s start by defining our constants:</p>
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">const</span> <span class="n">linear</span><span class="p">:</span> <span class="kt">u8</span> <span class="o">=</span> <span class="mi">7</span><span class="p">;</span> <span class="c">// log2(min_allocaction_size)</span>
+<span class="k">const</span> <span class="n">sub_bin</span><span class="p">:</span> <span class="kt">u8</span> <span class="o">=</span> <span class="mi">5</span><span class="p">;</span> <span class="c">// log2(sub_bin_count)</span>
+<span class="k">const</span> <span class="n">bin_count</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="mi">64</span> <span class="o">-</span> <span class="n">linear</span><span class="p">;</span> <span class="c">// 64 first level bins</span>
+<span class="k">const</span> <span class="n">sub_bin_count</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">sub_bin</span><span class="p">;</span>
+<span class="k">const</span> <span class="n">min_alloc_size</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">linear</span><span class="p">;</span>
+</code></pre></div></div>
+
+<h4 id="bin-mapping">Bin Mapping</h4>
+<p>We need to map allocation and memory block sizes to proper bin and subbin indices. Two types of mapping are required here: <em>map up</em> and <em>map down</em>. Whenever we what to perform a search for free blocks in order to allocate memory, we would need to <em>map up</em>, which is achieved by rounding up the size to the next subbin. This is necessary because we need to look for a subbin which contains blocks that can at least fit the requested size.</p>
+
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fn</span> <span class="n">binmap_up</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="n">vk</span><span class="p">.</span><span class="py">DeviceSize</span><span class="p">)</span> <span class="n">BlockMap</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="n">bin_idx</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="n">bit_scan_msb</span><span class="p">(</span><span class="n">size</span> <span class="p">|</span> <span class="n">min_alloc_size</span><span class="p">);</span>
+    <span class="k">const</span> <span class="n">log2_subbin_size</span><span class="p">:</span> <span class="kt">u6</span> <span class="o">=</span> <span class="nb">@intCast</span><span class="p">(</span><span class="n">bin_idx</span> <span class="o">-</span> <span class="n">sub_bin</span><span class="p">);</span>
+    <span class="k">const</span> <span class="n">next_subbin_offset</span> <span class="o">=</span> <span class="p">(</span><span class="nb">@as</span><span class="p">(</span><span class="kt">u64</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">log2_subbin_size</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span> <span class="c">// block_size - 1</span>
+    <span class="k">const</span> <span class="n">rounded</span> <span class="o">=</span> <span class="n">size</span> <span class="o">+%</span> <span class="n">next_subbin_offset</span><span class="p">;</span>
+    <span class="k">const</span> <span class="n">sub_bin_idx</span> <span class="o">=</span> <span class="n">rounded</span> <span class="o">&gt;&gt;</span> <span class="n">log2_subbin_size</span><span class="p">;</span> <span class="c">// rounded_size / block_size</span>
+    
+    <span class="k">const</span> <span class="n">adjusted_bin_idx</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="nb">@intCast</span><span class="p">((</span><span class="n">bin_idx</span> <span class="o">-</span> <span class="n">linear</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">sub_bin_idx</span> <span class="o">&gt;&gt;</span> <span class="n">sub_bin</span><span class="p">));</span> <span class="c">// adjust bin_idx with linear</span>
+    <span class="k">const</span> <span class="n">adjusted_sub_bin_idx</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="nb">@intCast</span><span class="p">(</span><span class="n">sub_bin_idx</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">sub_bin_count</span> <span class="o">-</span> <span class="mi">1</span><span class="p">));</span> <span class="c">// sub_bin_idx % sub_bin_count</span>
+    <span class="k">const</span> <span class="n">rounded_size</span> <span class="o">=</span> <span class="p">(</span><span class="n">rounded</span><span class="p">)</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">next_subbin_offset</span><span class="p">;</span>
+    
+    <span class="n">std</span><span class="p">.</span><span class="py">debug</span><span class="p">.</span><span class="nf">assert</span><span class="p">(</span><span class="n">adjusted_bin_idx</span> <span class="o">&lt;</span> <span class="n">bin_count</span><span class="p">);</span>
+    <span class="n">std</span><span class="p">.</span><span class="py">debug</span><span class="p">.</span><span class="nf">assert</span><span class="p">(</span><span class="n">adjusted_sub_bin_idx</span> <span class="o">&lt;</span> <span class="n">sub_bin_count</span><span class="p">);</span>
+    
+    <span class="k">return</span> <span class="o">.</span><span class="p">{</span>
+        <span class="p">.</span><span class="py">bin_idx</span> <span class="o">=</span> <span class="n">adjusted_bin_idx</span><span class="p">,</span>
+        <span class="p">.</span><span class="py">sub_bin_idx</span> <span class="o">=</span> <span class="n">adjusted_sub_bin_idx</span><span class="p">,</span>
+        <span class="p">.</span><span class="py">rounded_size</span> <span class="o">=</span> <span class="n">rounded_size</span><span class="p">,</span>
+    <span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>And for other operations like inserting new free block, we’ll map down.</p>
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fn</span> <span class="n">binmap_down</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="n">vk</span><span class="p">.</span><span class="py">DeviceSize</span><span class="p">)</span> <span class="n">BlockMap</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="n">bin_idx</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="n">bit_scan_msb</span><span class="p">(</span><span class="n">size</span> <span class="p">|</span> <span class="n">min_alloc_size</span><span class="p">);</span>
+    <span class="k">const</span> <span class="n">log2_subbin_size</span><span class="p">:</span> <span class="kt">u6</span> <span class="o">=</span> <span class="nb">@intCast</span><span class="p">(</span><span class="n">bin_idx</span> <span class="o">-</span> <span class="n">sub_bin</span><span class="p">);</span>
+    <span class="k">const</span> <span class="n">sub_bin_idx</span> <span class="o">=</span> <span class="n">size</span> <span class="o">&gt;&gt;</span> <span class="n">log2_subbin_size</span><span class="p">;</span> <span class="c">// size / block_size</span>
+
+    <span class="k">const</span> <span class="n">adjusted_bin_idx</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="nb">@intCast</span><span class="p">((</span><span class="n">bin_idx</span> <span class="o">-</span> <span class="n">linear</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">sub_bin_idx</span> <span class="o">&gt;&gt;</span> <span class="n">sub_bin</span><span class="p">));</span>
+    <span class="k">const</span> <span class="n">adjusted_sub_bin_idx</span><span class="p">:</span> <span class="kt">u32</span> <span class="o">=</span> <span class="nb">@intCast</span><span class="p">(</span><span class="n">sub_bin_idx</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">sub_bin_count</span> <span class="o">-</span> <span class="mi">1</span><span class="p">));</span>
+    <span class="k">const</span> <span class="n">rounded_size</span> <span class="o">=</span> <span class="n">size</span><span class="p">;</span>
+
+    <span class="n">std</span><span class="p">.</span><span class="py">debug</span><span class="p">.</span><span class="nf">assert</span><span class="p">(</span><span class="n">adjusted_bin_idx</span> <span class="o">&lt;</span> <span class="n">bin_count</span><span class="p">);</span>
+    <span class="n">std</span><span class="p">.</span><span class="py">debug</span><span class="p">.</span><span class="nf">assert</span><span class="p">(</span><span class="n">adjusted_sub_bin_idx</span> <span class="o">&lt;</span> <span class="n">sub_bin_count</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="o">.</span><span class="p">{</span>
+        <span class="p">.</span><span class="py">bin_idx</span> <span class="o">=</span> <span class="n">adjusted_bin_idx</span><span class="p">,</span>
+        <span class="p">.</span><span class="py">sub_bin_idx</span> <span class="o">=</span> <span class="n">adjusted_sub_bin_idx</span><span class="p">,</span>
+        <span class="p">.</span><span class="py">rounded_size</span> <span class="o">=</span> <span class="n">rounded_size</span><span class="p">,</span>
+    <span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<h4 id="free-block-lookup">Free Block Lookup</h4>
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">// bit sets for our lookup table</span>
+<span class="n">bin_bitmap</span><span class="p">:</span> <span class="kt">u32</span><span class="p">,</span>
+<span class="n">sub_bin_bitmap</span><span class="p">:</span> <span class="p">[</span><span class="n">bin_count</span><span class="p">]</span><span class="kt">u32</span><span class="p">,</span>
+</code></pre></div></div>
+
+<p>We first map the input size to bin and subbin indices and then perform a lookup on the bitsets to check whether the mapped bin and subbin have free blocks or not. If not, we lookup the next free bin, which by default will be large enough.</p>
+
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fn</span> <span class="n">findFreeBlock</span><span class="p">(</span><span class="n">self</span><span class="p">:</span> <span class="n">TSFLAllocator</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="n">vk</span><span class="p">.</span><span class="py">DeviceSize</span><span class="p">)</span> <span class="o">!</span><span class="n">BlockMap</span> <span class="p">{</span>
+    <span class="k">var</span> <span class="n">map</span> <span class="o">=</span> <span class="n">binmap_up</span><span class="p">(</span><span class="n">size</span><span class="p">);</span>
+    <span class="c">// look up with mapped bin and sub_bin</span>
+    <span class="k">var</span> <span class="n">sub_bin_bitmap</span> <span class="o">=</span> <span class="n">self</span><span class="p">.</span><span class="py">sub_bin_bitmap</span><span class="p">[</span><span class="n">map</span><span class="p">.</span><span class="py">bin_idx</span><span class="p">]</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">~</span><span class="nb">@as</span><span class="p">(</span><span class="kt">u32</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="nb">@intCast</span><span class="p">(</span><span class="n">map</span><span class="p">.</span><span class="py">sub_bin_idx</span><span class="p">));</span>
+
+    <span class="c">// not found</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">sub_bin_bitmap</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="c">// search for next free bin</span>
+        <span class="k">const</span> <span class="n">bin_bitmap</span> <span class="o">=</span> <span class="n">self</span><span class="p">.</span><span class="py">bin_bitmap</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">~</span><span class="nb">@as</span><span class="p">(</span><span class="kt">u32</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="nb">@intCast</span><span class="p">(</span><span class="n">map</span><span class="p">.</span><span class="py">bin_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">));</span>
+        <span class="c">// no free bins</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">bin_bitmap</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="k">return</span> <span class="k">error</span><span class="p">.</span><span class="py">OutOfFreeBlock</span><span class="p">;</span>
+        <span class="c">// convert bitset flag to bin index</span>
+        <span class="n">map</span><span class="p">.</span><span class="py">bin_idx</span> <span class="o">=</span> <span class="nb">@ctz</span><span class="p">(</span><span class="n">bin_bitmap</span><span class="p">);</span>
+        <span class="c">// any subbin will suffice</span>
+        <span class="n">sub_bin_bitmap</span> <span class="o">=</span> <span class="n">self</span><span class="p">.</span><span class="py">sub_bin_bitmap</span><span class="p">[</span><span class="n">map</span><span class="p">.</span><span class="py">bin_idx</span><span class="p">];</span>
+    <span class="p">}</span>
+
+    <span class="c">// get index of free block</span>
+    <span class="n">map</span><span class="p">.</span><span class="py">sub_bin_idx</span> <span class="o">=</span> <span class="nb">@ctz</span><span class="p">(</span><span class="n">sub_bin_bitmap</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="n">BlockMap</span><span class="p">{</span>
+        <span class="p">.</span><span class="py">bin_idx</span> <span class="o">=</span> <span class="n">map</span><span class="p">.</span><span class="py">bin_idx</span><span class="p">,</span>
+        <span class="p">.</span><span class="py">sub_bin_idx</span> <span class="o">=</span> <span class="n">map</span><span class="p">.</span><span class="py">sub_bin_idx</span><span class="p">,</span>
+        <span class="p">.</span><span class="py">rounded_size</span> <span class="o">=</span> <span class="n">map</span><span class="p">.</span><span class="py">rounded_size</span><span class="p">,</span>
+    <span class="p">};</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h4 id="insert-or-remove-block">Insert or Remove Block</h4>
+<p>Whenever we insert or remove a free block from our TSFL structure, we’ll need to update the lookup table aswell.</p>
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fn</span> <span class="n">insertFreeBlock</span><span class="p">(</span><span class="n">self</span><span class="p">:</span> <span class="o">*</span><span class="n">TSFLAllocator</span><span class="p">,</span> <span class="n">block</span><span class="p">:</span> <span class="o">*</span><span class="n">Block</span><span class="p">)</span> <span class="k">void</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="n">map</span> <span class="o">=</span> <span class="n">binmap_down</span><span class="p">(</span><span class="n">block</span><span class="p">.</span><span class="py">size</span><span class="p">);</span>
+
+    <span class="c">//////////////////////////////////////////////////////</span>
+    <span class="c">//  You'd be updating your freelist here</span>
+    <span class="c">//////////////////////////////////////////////////////</span>
+ 
+    <span class="c">// set bin and subbin bitset</span>
+    <span class="n">self</span><span class="p">.</span><span class="py">bin_bitmap</span> <span class="p">|</span><span class="o">=</span> <span class="nb">@as</span><span class="p">(</span><span class="kt">u32</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="nb">@intCast</span><span class="p">(</span><span class="n">map</span><span class="p">.</span><span class="py">bin_idx</span><span class="p">);</span>
+    <span class="n">self</span><span class="p">.</span><span class="py">sub_bin_bitmap</span><span class="p">[</span><span class="n">map</span><span class="p">.</span><span class="py">bin_idx</span><span class="p">]</span> <span class="p">|</span><span class="o">=</span> <span class="nb">@as</span><span class="p">(</span><span class="kt">u32</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="nb">@intCast</span><span class="p">(</span><span class="n">map</span><span class="p">.</span><span class="py">sub_bin_idx</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h3 id="good-fit">Good-fit</h3>
+<p>Since we are rounding up the size to the next subbin during free block lookup, TLSF will try to return the smallest chunk of memory big enough to hold the requested block. This makes the algorithm almost best-fit but not exactly best-fit, also called good-fit.</p>
+
+<h3 id="wrap-up">Wrap-Up</h3>
+<p>And that’s it, everything from here on would involve managing the freelist that are associated with our subbins. Since the operations for searching, inserting and removing are now O(1) with the help of our fast bitset lookup, the resulting allocation or free operation is also O(1). This kind of binning algorithm has multiple use cases, with optimizing memory allocation being one of them.</p>
+
+<h4 id="complete-example">Complete Example</h4>
+<ul>
+  <li><a href="https://gist.github.com/AshishBhattarai/7cabbba3144e24b95e12b86a33f32647">Zig Implementation</a></li>
+</ul>
+
+<h5 id="references">References</h5>
+<ul>
+  <li><a href="http://www.gii.upv.es/tlsf/files/papers/ecrts04_tlsf.pdf">TLSF: a New Dynamic Memory Allocator for Real-Time Systems</a></li>
+  <li><a href="https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator">VulkanMemoryAllocator</a></li>
+  <li><a href="https://pvk.ca/Blog/2015/06/27/linear-log-bucketing-fast-versatile-simple/">Linear-log bucketing: fast, versatile, simple</a></li>
+</ul>]]></content><author><name>RiceFields</name></author><category term="code" /><summary type="html"><![CDATA[Optimizing memory allocation with Two-Level Segregated Fit (TLSF)]]></summary></entry><entry><title type="html">Code Principle - Data &amp;amp; Transformation</title><link href="https://ricefields.me/2022/08/12/code-principles-data-and-transformation.html" rel="alternate" type="text/html" title="Code Principle - Data &amp;amp; Transformation" /><published>2022-08-12T00:00:00+07:00</published><updated>2022-08-12T00:00:00+07:00</updated><id>https://ricefields.me/2022/08/12/code-principles-data-and-transformation</id><content type="html" xml:base="https://ricefields.me/2022/08/12/code-principles-data-and-transformation.html"><![CDATA[<p>Hello there. It’s been a while since my last post. There goes my goal of writing at least one article every month. This time it’s a lot more theoretical, as opposed to my previous pile of technical turd. So let us begin.</p>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>Most often we tend to only think about code in terms of logic or structure. When designing software, we often worry about languages and frameworks, data structure and algorithms, and classes and modules. We tend to forget about one of the most important aspects of software – <code class="language-plaintext highlighter-rouge">Data</code> and <code class="language-plaintext highlighter-rouge">Transformation</code>. Let us explore how taking <code class="language-plaintext highlighter-rouge">Data</code> and <code class="language-plaintext highlighter-rouge">Transformation</code> into account ultimately leads to a better software design.</p>
+
+<p>We shall begin by forming a concise yet flexible criteria for ‘good design’.</p>
+
+<h2 id="what-is-good-software-design-">What is Good Software Design ?</h2>
+
+<p>Software – as its name suggests – is meant to change and extend. It is ‘soft’, unlike hardware, which is generally meant to be fixed (hard). Software is expected to be susceptible to changes. When the requirements change, it falls upon us the developers to make sure that our software effectively adapts to the proposed changes. This often boils down to diving into the codebase and making required changes. Based on this, we can argue that good software design is design that is susceptible to change - i.e. easier to change.</p>
+
+<p>There are many patterns, principles and guidelines that help in designing software that is easier to change. Taking <code class="language-plaintext highlighter-rouge">Data Transformation</code> into account while designing is one such guideline that we’ll be exploring today.</p>
+
+<h2 id="data--transformation">Data &amp; Transformation</h2>
+
+<p><code class="language-plaintext highlighter-rouge">Data</code> is a vital part of any program. A program, in a basic sense, is a set of instructions that operates, communicates, processes, stores and/or presents data. When data flows through a program, it passes through operations that might introduce changes to the data in different ways, which can be defined as a <code class="language-plaintext highlighter-rouge">Transformation</code>. When a program operates on or changes a piece of data, we can basically say that the program transforms the data.</p>
+
+<p class="message">
+<i>Programming is About Code, But Programs Are About Data.</i>
+<br />
+- The Pragmatic Programmer
+</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// A basic example of data &amp; transformation</span>
+
+<span class="kd">const</span> <span class="nx">dataA</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1203</span><span class="p">,</span> <span class="mi">2123</span><span class="p">,</span> <span class="mi">2134</span><span class="p">,</span> <span class="mi">2323</span><span class="p">];</span>
+
+<span class="kd">const</span> <span class="nx">dataB</span> <span class="o">=</span> <span class="nx">dataA</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">x</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">x</span><span class="p">.</span><span class="nf">toString</span><span class="p">());</span>
+</code></pre></div></div>
+
+<p>Here, the array of numbers <code class="language-plaintext highlighter-rouge">dataA</code> is transformed into the array of strings <code class="language-plaintext highlighter-rouge">dataB</code> via <code class="language-plaintext highlighter-rouge">map</code>, which is a function that defines the transformation.</p>
+
+<h2 id="thinking-in-terms-of-transformation">Thinking in Terms of Transformation</h2>
+
+<p>We can start thinking of a program as a series of transformations. The data passes through one or more transformations, each one of which operates on the data in order to produce the desired output. Let’s make this concept clear with a quick example.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// A program that takes a user.csv file, parses it.</span>
+<span class="c1">// And sends notification to the user while logging failures if any.</span>
+
+<span class="kd">const</span> <span class="nx">users</span> <span class="o">=</span> <span class="nx">CSV</span><span class="p">.</span><span class="nf">parse</span><span class="p">(</span><span class="dl">"</span><span class="s2">user.csv</span><span class="dl">"</span><span class="p">);</span>
+<span class="c1">// filter users with valid email</span>
+<span class="kd">const</span> <span class="nx">usersWithValidEmail</span> <span class="o">=</span> <span class="nx">users</span><span class="p">.</span><span class="nf">filter</span><span class="p">((</span><span class="nx">u</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">u</span><span class="p">.</span><span class="nx">email</span><span class="p">);</span>
+<span class="c1">// extract email array</span>
+<span class="kd">const</span> <span class="nx">emails</span> <span class="o">=</span> <span class="nx">usersWithValidEmail</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">u</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">u</span><span class="p">.</span><span class="nx">email</span><span class="p">);</span>
+<span class="c1">// send notification</span>
+<span class="kd">const</span> <span class="nx">results</span> <span class="o">=</span> <span class="nf">sendNotification</span><span class="p">(</span><span class="nx">emails</span><span class="p">);</span>
+<span class="c1">// filter failure</span>
+<span class="kd">const</span> <span class="nx">failures</span> <span class="o">=</span> <span class="nx">result</span><span class="p">.</span><span class="nf">filter</span><span class="p">((</span><span class="nx">r</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="o">!</span><span class="nx">r</span><span class="p">.</span><span class="nx">success</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>The <code class="language-plaintext highlighter-rouge">user.csv</code> file here contains our data. Our program basically does 4 operations on this data:</p>
+
+<ol>
+  <li>Acquire through parse,</li>
+  <li>Filter valid emails,</li>
+  <li>Send notification to those emails,</li>
+  <li>Filter failures.</li>
+</ol>
+
+<p>To carry out these operations, we move our data through a series of transformations until we reach our end goal.</p>
+
+<p>This approach in programming – where we chain multiple transformations by passing one output as input to another is known as pipelining. Pipelining is mostly provided as a feature in functional languages, where a pipeline operator <code class="language-plaintext highlighter-rouge">|&gt;</code> automatically pipes output of one transformation as input to another.</p>
+
+<div class="language-elixir highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">CSV</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="s1">'user.csv'</span><span class="p">)</span>
+  <span class="o">|&gt;</span> <span class="no">Enum</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="o">&amp;</span> <span class="n">!is_nil</span><span class="p">(</span><span class="nv">&amp;1</span><span class="o">.</span><span class="n">email</span><span class="p">))</span>
+  <span class="o">|&gt;</span> <span class="no">Enum</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="o">&amp;</span> <span class="nv">&amp;1</span><span class="o">.</span><span class="n">email</span><span class="p">)</span>
+  <span class="o">|&gt;</span> <span class="n">send_notification</span><span class="p">()</span>
+  <span class="o">|&gt;</span> <span class="no">Enum</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="o">&amp;</span> <span class="n">!</span><span class="nv">&amp;1</span><span class="o">.</span><span class="n">success</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>This is same example but with the pipe operator. Another way to do this kind of chaining is with composition. Composition is somewhat similar to pipelining but true to its mathematical meaning.</p>
+
+<p>The goal is not to hoard state, but to pass them around and have our code conduct required operations, which in turn produce new state that’s essentially derived from the old state. Note that we try not to mutate state, but instead we derive new state from the previous one.</p>
+
+<p>It’s always a good idea to avoid mutation whenever possible. Avoiding mutation deserves its own separate article, but I digress.</p>
+
+<p>Since ’Thinking in terms of transformation’ is a mouthful, let’s just call this <code class="language-plaintext highlighter-rouge">Transformative Programming</code>.</p>
+
+<h2 id="transformative-programing-a-good-design-approach">Transformative Programing a Good Design Approach</h2>
+
+<p>As we have learned, good software design is design that’s easier to change, but we haven’t yet explored what makes bad software design.
+Or to rephrase, <em>what makes a software difficult to change?</em></p>
+
+<p><strong>Coupling.</strong></p>
+
+<p class="message">
+<i>Coupling ties things together, so that it's harder to change just one thing.</i>
+<br />
+- The pragmatic programming
+</p>
+
+<p><code class="language-plaintext highlighter-rouge">Transformative Programming</code> helps reduce coupling. Transformations are by design independent of each other. In fact, a transformation doesn’t even need to know about the existence of any other transformation. A transformation is only concerned with a specific operation that needs to be performed on its input.</p>
+
+<p>Besides reduced coupling, <code class="language-plaintext highlighter-rouge">Transformative Programming</code>  provides other goodies, such as increased code readability and better DRY (don’t repeat yourself) (don’t repeat yourself). As the program is divided into similar well-defined transformations, readability increases. The fact that the code is being broken into smaller transformations means that they can be effectively reused as needed.</p>
+
+<p>Let’s look at an example of a method <code class="language-plaintext highlighter-rouge">sendNotification</code>, which is responsible for sending notifications to a given user.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nf">sendNotification</span><span class="p">(</span><span class="nx">notification</span><span class="p">,</span> <span class="nx">user</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">results</span> <span class="o">=</span> <span class="p">[];</span>
+  <span class="kd">const</span> <span class="nx">devices</span> <span class="o">=</span> <span class="nx">user</span><span class="p">.</span><span class="nf">getDevices</span><span class="p">();</span>
+  <span class="c1">// loop through user devices</span>
+  <span class="k">for </span><span class="p">(</span><span class="nx">device</span> <span class="k">of</span> <span class="nx">devices</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">registrationId</span> <span class="o">=</span> <span class="nx">device</span><span class="p">.</span><span class="nx">registrationId</span><span class="p">;</span>
+    <span class="c1">// pre-process notification content</span>
+    <span class="kd">const</span> <span class="nx">body</span> <span class="o">=</span> <span class="nf">processTemplate</span><span class="p">(</span><span class="nx">notification</span><span class="p">.</span><span class="nx">body</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+    <span class="kd">const</span> <span class="nx">title</span> <span class="o">=</span> <span class="nf">processTemplate</span><span class="p">(</span><span class="nx">notification</span><span class="p">.</span><span class="nx">title</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+    <span class="c1">// queue notification</span>
+    <span class="kd">const</span> <span class="nx">result</span> <span class="o">=</span> <span class="nx">NotificationClientApi</span><span class="p">.</span><span class="nf">queueNotification</span><span class="p">(</span><span class="nx">registrationId</span><span class="p">,</span> <span class="p">{</span>
+      <span class="na">body</span><span class="p">:</span> <span class="nx">body</span><span class="p">,</span>
+      <span class="na">title</span><span class="p">:</span> <span class="nx">title</span><span class="p">,</span>
+    <span class="p">});</span>
+    <span class="c1">// store result</span>
+    <span class="nx">results</span><span class="p">.</span><span class="nf">push</span><span class="p">(</span><span class="nx">result</span><span class="p">);</span>
+  <span class="p">}</span>
+
+  <span class="k">return</span> <span class="nx">results</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now let’s write this code with a transformative approach.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// A function to pre-process notification content,</span>
+<span class="kd">function</span> <span class="nf">processNotificationContent</span><span class="p">(</span><span class="nx">notification</span><span class="p">,</span> <span class="nx">user</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">body</span> <span class="o">=</span> <span class="nf">processTemplate</span><span class="p">(</span><span class="nx">notification</span><span class="p">.</span><span class="nx">body</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+  <span class="kd">const</span> <span class="nx">title</span> <span class="o">=</span> <span class="nf">processTemplate</span><span class="p">(</span><span class="nx">notification</span><span class="p">.</span><span class="nx">title</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+
+  <span class="k">return</span> <span class="p">{</span> <span class="na">body</span><span class="p">:</span> <span class="nx">body</span><span class="p">,</span> <span class="na">title</span><span class="p">:</span> <span class="nx">title</span> <span class="p">};</span>
+<span class="p">}</span>
+
+<span class="c1">// A function that actually queues the notification, using some client library.</span>
+<span class="kd">function</span> <span class="nf">queueNotification</span><span class="p">(</span><span class="nx">registrationIds</span><span class="p">,</span> <span class="nx">notificationContent</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">registrationIds</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">regId</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">NotificationClientApi</span><span class="p">.</span><span class="nf">queueNotification</span><span class="p">(</span><span class="nx">regId</span><span class="p">,</span> <span class="nx">notificationContent</span><span class="p">)</span>
+  <span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nf">sendNotification</span><span class="p">(</span><span class="nx">notification</span><span class="p">,</span> <span class="nx">user</span><span class="p">)</span> <span class="p">{</span>
+  <span class="c1">// 1 - processNotificationContent</span>
+  <span class="kd">const</span> <span class="nx">notificationContent</span> <span class="o">=</span> <span class="nf">processNotificationContent</span><span class="p">(</span><span class="nx">notification</span><span class="p">,</span> <span class="nx">user</span><span class="p">);</span>
+  <span class="c1">// 2 - get registrationIds</span>
+  <span class="kd">const</span> <span class="nx">registrationIds</span> <span class="o">=</span> <span class="nx">user</span><span class="p">.</span><span class="nf">getDevices</span><span class="p">().</span><span class="nf">map</span><span class="p">((</span><span class="nx">d</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">d</span><span class="p">.</span><span class="nx">registrationId</span><span class="p">);</span>
+  <span class="c1">// 3 - queue notification</span>
+  <span class="k">return</span> <span class="nf">queueNotification</span><span class="p">(</span><span class="nx">registrationIds</span><span class="p">,</span> <span class="nx">notificationContent</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>We can immediately notice that the code is a lot more readable, along with better separation of concern, as each transformation only applies a specific operation on the data. The code has become much easier to change.</p>
+
+<p>For example, if we add an additional templated field on the notification object, just by having a glance at the piece of code, we find that the only thing that needs to be updated is <code class="language-plaintext highlighter-rouge">processNotificationContent</code>.</p>
+
+<h2 id="transformative-programming-in-real-world">Transformative Programming in Real World</h2>
+
+<p>At this point, it’s possible to develop the impression that transformative programming is only applicable to functional programming. We will discover this to not be the case, since transformative programming can find its way into your code base and improve it regardless of the style you follow.</p>
+
+<p>In fact, you might already be using aspects of transformative programming, with utility functions like <code class="language-plaintext highlighter-rouge">map</code>, <code class="language-plaintext highlighter-rouge">reduce</code>, <code class="language-plaintext highlighter-rouge">filter</code> etc. that most programming languages now provide within their standard library.</p>
+
+<p>Let’s have a look at yet another contrived example:</p>
+
+<blockquote>
+  <p>Leys say, we have an e-commerce application, and need to calculate discounts for product orders in a shopping cart, based on a known fixed discount value. The discount might be applied to select orders or the whole cart (all orders).</p>
+</blockquote>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Example:1 - Normal OOP</span>
+<span class="kd">class</span> <span class="nc">Order</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical order contains */</span>
+
+  <span class="c1">// Applies discount and calculates final cost</span>
+  <span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// calculate new cost</span>
+    <span class="kd">const</span> <span class="nx">newCost</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">cost</span> <span class="o">-</span> <span class="nx">discountValue</span><span class="p">;</span>
+    <span class="c1">// check if its within range</span>
+    <span class="k">return</span> <span class="nx">newCost</span> <span class="o">&gt;</span> <span class="k">this</span><span class="p">.</span><span class="nx">lowestPossiblePrice</span>
+      <span class="p">?</span> <span class="nx">newCost</span>
+      <span class="p">:</span> <span class="k">this</span><span class="p">.</span><span class="nx">lowestPossiblePrice</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="c1">// Applies discount to the order, mutating the order</span>
+  <span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">costAfterDiscount</span> <span class="o">=</span> <span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">class</span> <span class="nc">Cart</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical order contains */</span>
+
+  <span class="c1">// Calculates total cost with discount applied to all orders in the card</span>
+  <span class="nf">calculateTotalCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">totalDiscount</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="c1">// calculate cost after the discount has been applied</span>
+    <span class="k">for </span><span class="p">(</span><span class="kd">const</span> <span class="nx">order</span> <span class="k">of</span> <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">totalDiscount</span> <span class="o">+=</span> <span class="nx">order</span><span class="p">.</span><span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">totalDiscount</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="c1">// Applies discount to each order in the cart, mutating the cart</span>
+  <span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">for </span><span class="p">(</span><span class="kd">const</span> <span class="nx">order</span> <span class="k">of</span> <span class="nx">orders</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">this</span><span class="p">.</span><span class="nx">order</span><span class="p">.</span><span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+
+  <span class="c1">// Applies discount to all orders in the cart-</span>
+  <span class="c1">// which match the given orderIds, mutating the cart</span>
+  <span class="nf">applyDiscountOnOrders</span><span class="p">(</span><span class="nx">orderIds</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">for </span><span class="p">(</span><span class="kd">const</span> <span class="nx">cartOrder</span> <span class="k">of</span> <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">for </span><span class="p">(</span><span class="kd">const</span> <span class="nx">applicableOrderId</span> <span class="k">of</span> <span class="nx">orderIds</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if </span><span class="p">(</span><span class="nx">cartOrder</span><span class="p">.</span><span class="nx">id</span> <span class="o">==</span> <span class="nx">applicableOrderId</span><span class="p">)</span> <span class="p">{</span>
+          <span class="nx">cartOrder</span><span class="p">.</span><span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+        <span class="p">}</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Here we have a basic cart-order system written with an Object-Oriented approach, which basically calculates or applies discount to the orders in cart. Everything is well-contained and the coupling is managed, but we could improve it with some <code class="language-plaintext highlighter-rouge">Transformative Programming</code>.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Example:2 - OOP with aspect of transformation</span>
+<span class="kd">class</span> <span class="nc">Order</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical order contains */</span>
+
+  <span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// we leverage Math.max instead of comparing values</span>
+    <span class="k">return</span> <span class="nb">Math</span><span class="p">.</span><span class="nf">max</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">cost</span> <span class="o">-</span> <span class="nx">discountValue</span><span class="p">,</span> <span class="k">this</span><span class="p">.</span><span class="nx">lowestPossiblePrice</span><span class="p">);</span>
+  <span class="p">}</span>
+
+  <span class="kd">function</span> <span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">costAfterDiscount</span> <span class="o">=</span> <span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">class</span> <span class="nc">Cart</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical cart contains */</span>
+
+  <span class="nf">calculateTotalCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// return this.orders.reduce((acc, curr) =&gt; acc + curr.calculateDiscount(discountValue), 0);</span>
+
+    <span class="c1">// 1 - we first transform orders into number (cost with discount)</span>
+    <span class="kd">const</span> <span class="nx">discounts</span><span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">order</span><span class="p">.</span><span class="nf">calculateCostWithDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">))</span>
+    <span class="c1">// 2 - we transform the numbers using reduce to a single summed value</span>
+    <span class="k">return</span> <span class="nx">discounts</span><span class="p">.</span><span class="nf">reduce</span><span class="p">((</span><span class="nx">acc</span><span class="p">,</span> <span class="nx">curr</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">acc</span> <span class="o">+</span> <span class="nx">curr</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+  <span class="p">}</span>
+
+  <span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">forEach</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">order</span><span class="p">.</span><span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">));</span>
+  <span class="p">}</span>
+
+  <span class="nf">applyDiscountOnOrders</span><span class="p">(</span><span class="nx">orderIds</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// 1 - we transform cart orders into applicableOrders using filter + find</span>
+    <span class="kd">const</span> <span class="nx">applicableOrders</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">filter</span><span class="p">((</span><span class="nx">cartOrder</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">orderIds</span><span class="p">.</span><span class="nf">find</span><span class="p">((</span><span class="nx">applicableOrderId</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">cartOrder</span> <span class="o">==</span> <span class="nx">applicableOrderId</span><span class="p">));</span>
+    <span class="c1">// 2 - apply discount to each order, mutating in on the process</span>
+    <span class="nx">applicableOrders</span><span class="p">.</span><span class="nf">forEach</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">order</span><span class="p">.</span><span class="nf">applyDiscount</span><span class="p">(</span><span class="nx">discountValue</span><span class="p">));</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now the code is much more readable. It can be further improved by minimizing mutations and switching to structured types, which in-turn makes our code reusable in a way that wasn’t possible before. Also, I recommend using something like <a href="https://lodash.com/">lodash</a> to compensate for lack of proper utilities in javascript.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cm">/**
+ * order
+ **/</span>
+<span class="kd">type</span> <span class="nx">Order</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical order contains */</span>
+<span class="p">};</span>
+
+<span class="c1">// Applies discount to the order, without mutating the order</span>
+<span class="kd">function</span> <span class="nf">orderWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">:</span> <span class="nx">Order</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">:</span> <span class="kr">number</span><span class="p">):</span> <span class="nx">Order</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">costAfterDiscount</span> <span class="o">=</span> <span class="nb">Math</span><span class="p">.</span><span class="nf">max</span><span class="p">(</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">price</span> <span class="o">-</span> <span class="nx">discountValue</span><span class="p">,</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">lowestPossibleCost</span>
+  <span class="p">);</span>
+
+  <span class="c1">// return a new order with discount applied</span>
+  <span class="k">return</span> <span class="nf">clone</span><span class="p">(</span><span class="k">this</span><span class="p">,</span> <span class="p">{</span>
+    <span class="na">costAfterDiscount</span><span class="p">:</span> <span class="nx">costAfterDiscount</span><span class="p">,</span>
+    <span class="na">discountValue</span><span class="p">:</span> <span class="nx">discountValue</span><span class="p">,</span>
+  <span class="p">});</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nf">orderCostAfterDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">):</span> <span class="kr">number</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">order</span><span class="p">.</span><span class="nx">costAfterDiscount</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="cm">/**
+ * Cart
+ **/</span>
+<span class="kd">type</span> <span class="nx">Cart</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="cm">/* Everything that a typical cart contains */</span>
+<span class="p">};</span>
+
+<span class="c1">// Calculate total cost including the discount</span>
+<span class="kd">function</span> <span class="nf">cartCalcTotalCostWithDiscount</span><span class="p">(</span>
+  <span class="nx">cart</span><span class="p">:</span> <span class="nx">Cart</span><span class="p">,</span>
+  <span class="nx">discountValue</span><span class="p">:</span> <span class="kr">number</span>
+<span class="p">):</span> <span class="kr">number</span> <span class="p">{</span>
+  <span class="c1">// Since orderWithDiscount doesn't modify the order, we can use to to calculate total</span>
+  <span class="kd">const</span> <span class="nx">orders</span> <span class="o">=</span> <span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nf">orderWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span>
+  <span class="p">);</span>
+  <span class="k">return</span> <span class="nx">orders</span><span class="p">.</span><span class="nf">reduce</span><span class="p">((</span><span class="nx">acc</span><span class="p">,</span> <span class="nx">curr</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">acc</span> <span class="o">+</span> <span class="nf">orderCostAfterDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">),</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// Applies discount to orders in a cart, without mutating the cart</span>
+<span class="kd">function</span> <span class="nf">cartWithDiscount</span><span class="p">(</span><span class="nx">cart</span><span class="p">:</span> <span class="nx">Cart</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">:</span> <span class="kr">number</span><span class="p">):</span> <span class="nx">Cart</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">orders</span> <span class="o">=</span> <span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nf">orderWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span>
+  <span class="p">);</span>
+
+  <span class="c1">// return a new cart with updated orders</span>
+  <span class="k">return</span> <span class="nf">clone</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="p">{</span> <span class="na">orders</span><span class="p">:</span> <span class="nx">orders</span> <span class="p">});</span>
+<span class="p">}</span>
+
+<span class="c1">// using lodash</span>
+<span class="c1">// Applies discount to orders that match the give order ids,</span>
+<span class="c1">// without mutating the supplied cart</span>
+<span class="kd">function</span> <span class="nf">cartWithDiscountOnOrders</span><span class="p">(</span>
+  <span class="nx">cart</span><span class="p">:</span> <span class="nx">Cart</span><span class="p">,</span>
+  <span class="nx">orderIds</span><span class="p">:</span> <span class="nx">OrderId</span><span class="p">[],</span>
+  <span class="nx">discountValue</span><span class="p">:</span> <span class="kr">number</span>
+<span class="p">):</span> <span class="nx">Cart</span> <span class="p">{</span>
+  <span class="c1">// 1 - filter applicable orders</span>
+  <span class="kd">const</span> <span class="nx">applicableOrders</span> <span class="o">=</span> <span class="nx">_</span><span class="p">.</span><span class="nf">intersectionBy</span><span class="p">(</span><span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">,</span> <span class="nx">orders</span><span class="p">,</span> <span class="dl">"</span><span class="s2">id</span><span class="dl">"</span><span class="p">);</span>
+  <span class="c1">// 2 - apply discount to applicable orders</span>
+  <span class="kd">const</span> <span class="nx">discountedOrders</span> <span class="o">=</span> <span class="nx">_</span><span class="p">.</span><span class="nf">map</span><span class="p">(</span><span class="nx">applicableOrders</span><span class="p">,</span> <span class="p">(</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nf">orderWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">,</span> <span class="nx">discountValue</span><span class="p">)</span>
+  <span class="p">);</span>
+  <span class="c1">// 3 - create a set of orders - applicable orders</span>
+  <span class="kd">const</span> <span class="nx">filteredOrders</span> <span class="o">=</span> <span class="nx">_</span><span class="p">.</span><span class="nf">difference</span><span class="p">(</span><span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">,</span> <span class="nx">applicableOrders</span><span class="p">);</span>
+
+  <span class="c1">// return new cart with updated orders</span>
+  <span class="k">return</span> <span class="nf">clone</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="p">{</span> <span class="na">orders</span><span class="p">:</span> <span class="nx">_</span><span class="p">.</span><span class="nf">concat</span><span class="p">(</span><span class="nx">filteredOrders</span><span class="p">,</span> <span class="nx">applicableOrders</span><span class="p">)</span> <span class="p">});</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Let’s add some additional functionality – like payment processing, and conditions for discounts to be applicable, which are just more transformations that contain steps required to process a payment.</p>
+
+<blockquote>
+  <p>The discount should be applied only if the total cost of the cart is greater than a certain threshold.</p>
+</blockquote>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nf">processPayment</span><span class="p">(</span><span class="nx">cart</span><span class="p">:</span> <span class="nx">Cart</span><span class="p">,</span> <span class="nx">payment</span><span class="p">:</span> <span class="nx">Options</span><span class="p">):</span> <span class="nx">Cart</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">totalCost</span> <span class="o">=</span> <span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">map</span><span class="p">((</span><span class="nx">order</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nf">orderCostWithDiscount</span><span class="p">(</span><span class="nx">order</span><span class="p">))</span>
+  <span class="cm">/**
+   * Apply necessary transformations, call payment service APIs
+  **/</span>
+  <span class="kd">const</span> <span class="nx">paymentStatus</span> <span class="o">=</span> <span class="p">...;</span>
+  <span class="k">return</span> <span class="nf">clone</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="p">{</span><span class="na">paymentStatus</span><span class="p">:</span> <span class="nx">paymentStatus</span><span class="p">})</span>
+<span class="p">}</span>
+
+
+<span class="cm">/**
+ Apply discount and process payment
+**/</span>
+<span class="kd">const</span> <span class="nx">config</span> <span class="o">=</span> <span class="p">..;</span>
+<span class="kd">const</span> <span class="nx">paymentOptions</span> <span class="o">=</span> <span class="p">..;</span>
+
+<span class="c1">// 1 - calculate total cost</span>
+<span class="kd">const</span> <span class="nx">totalCost</span> <span class="o">=</span> <span class="nx">cart</span><span class="p">.</span><span class="nx">orders</span><span class="p">.</span><span class="nf">reduce</span><span class="p">((</span><span class="nx">acc</span><span class="p">,</span> <span class="nx">curr</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">acc</span> <span class="o">+</span> <span class="nx">curr</span><span class="p">.</span><span class="nx">cost</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="c1">// 2 - check if discount is applicable</span>
+<span class="kd">const</span> <span class="nx">discountValue</span> <span class="o">=</span> <span class="p">(</span><span class="nx">totalCost</span> <span class="o">&gt;</span> <span class="nx">config</span><span class="p">.</span><span class="nx">discountThreshold</span><span class="p">)?</span> <span class="nx">config</span><span class="p">.</span><span class="nx">discountValue</span> <span class="p">:</span> <span class="mi">0</span>
+<span class="c1">// 3 - apply the discount</span>
+<span class="kd">const</span> <span class="nx">discountedCart</span> <span class="o">=</span> <span class="nf">cartWithDiscount</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="nx">constrainedDiscountValue</span><span class="p">);</span>
+<span class="c1">// 4- process payment</span>
+<span class="kd">const</span> <span class="nx">paymentProcessedCart</span> <span class="o">=</span> <span class="nf">processPayment</span><span class="p">(</span><span class="nx">cart</span><span class="p">,</span> <span class="nx">paymentOptions</span><span class="p">);</span>
+<span class="cm">/**
+  Somewhere down the line, we save our most recent state
+ */</span>
+<span class="nx">db</span><span class="p">.</span><span class="nf">persist</span><span class="p">(</span><span class="nx">paymentProcessedCart</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Here, we are able to represent our business logic in terms of data and transformation, where each transformation is self-descriptive and isolated. There is no mutation; each transformation leads to a new state that could be utilized by the caller as they prefer, like when we use <code class="language-plaintext highlighter-rouge">orderWithDiscount</code> inside <code class="language-plaintext highlighter-rouge">cartCalcTotalCostWithDiscount</code> in order to calculate total discount value, while avoiding mutation of orders in the existing cart.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>We now understand that thinking in terms of data transformation leads to a code that is easier to change and understand. Even though transformative programming has its roots in functional programming we can easily adapt its aspects to any form programming approach.</p>
+
+<h2 id="references">References</h2>
+
+<ul>
+  <li><em>The Pragmatic Programmer by David Thomas &amp; Andrew Hunt</em></li>
+</ul>]]></content><author><name>RiceFields</name></author><category term="code" /><category term="code design" /><summary type="html"><![CDATA[We discuss how thinking software design in terms of data and transformation helps improve overall software design.]]></summary></entry><entry><title type="html">Understanding Static Variables in Rust</title><link href="https://ricefields.me/2021/05/29/static-variables-in-rust.html" rel="alternate" type="text/html" title="Understanding Static Variables in Rust" /><published>2021-05-29T00:00:00+07:00</published><updated>2021-05-29T00:00:00+07:00</updated><id>https://ricefields.me/2021/05/29/static-variables-in-rust</id><content type="html" xml:base="https://ricefields.me/2021/05/29/static-variables-in-rust.html"><![CDATA[<p>Hello there, I hope you are doing ok. Today I would like to talk about static variables in Rust, compare them with static variables in C++ and also   try to reason about the rules imposed by Rust on static variables.</p>
+
+<h2 id="introduction">Introduction</h2>
+<p>Static variable are variables declared with a <code class="language-plaintext highlighter-rouge">static</code> keyword and represent a specific global memory location (They are also known as global variables). Static variables have static life-time, a static life-time never goes out of scope and is guaranteed to out live any other variable. Meaning even if they are declared inside a scope their life-time does not begin or end with the scope.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fn</span> <span class="nf">func</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="o">&amp;</span><span class="k">'static</span> <span class="n">i23</span> <span class="p">{</span>
+   <span class="c1">// global variable, same global memory location for every call.</span>
+   <span class="k">static</span> <span class="n">SOMETHING</span><span class="p">:</span> <span class="nb">i32</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+   <span class="k">return</span> <span class="o">&amp;</span><span class="n">SOMETHING</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// every call to func() returns reference to same memory location.</span>
+<span class="nf">func</span><span class="p">()</span>
+<span class="nf">func</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>In Rust,</p>
+<ul>
+  <li><em>static variables must be initialized at compile-time</em> (Meaning they cannot be initialized with state which can only be known at runtime),</li>
+  <li><em>The type of static variable must have the <a href="https://doc.rust-lang.org/nomicon/send-and-sync.html">Sync trait</a> bound</em> (Meaning the type should be safe to share between threads, <code class="language-plaintext highlighter-rouge">Sync</code> is an automatically derived trait with some exceptions) and</li>
+  <li><em>mutating a static variable is only possible in an unsafe context</em>.</li>
+</ul>
+
+<p>In this post we’ll try to reason about these rules that are imposed by Rust on the static variables and also talk about why such rules are important.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// OK - 0 can be known at complete time.</span>
+<span class="k">static</span> <span class="n">SOME_THING</span><span class="p">:</span> <span class="nb">i32</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="c1">// Error heap allocation is only possible in runtime.</span>
+<span class="k">static</span> <span class="n">MEM</span><span class="p">:</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;</span> <span class="o">=</span> <span class="nn">Box</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>To understand rules behind static variables let us take a short dive into the land of assembly.</p>
+
+<h2 id="land-of-assembly">Land of Assembly</h2>
+<p>Rust is a native language that compiles down to assembly. An assembly program is generally divided into three sections:</p>
+
+<ul>
+  <li>data</li>
+  <li>bss</li>
+  <li>text</li>
+</ul>
+
+<p>The <code class="language-plaintext highlighter-rouge">data</code> section contains all the initialized static variables with their initial value, <code class="language-plaintext highlighter-rouge">bss</code> section contains all uninitialized/zero-initialized static variables and finally the <code class="language-plaintext highlighter-rouge">text</code> section contains all our code in assembly. You can read more about assembly layout <a href="https://en.wikipedia.org/wiki/Data_segment">here</a>. (This stuff is platform dependent so take it with a grain of salt.)</p>
+
+<h2 id="back-to-rust">Back to Rust</h2>
+
+<p>Rust does not allow uninitialized static variables. So, the data, bss section may contain either initialized or zero-initialized static variables. Also, <strong>since assembly is generated after compiling the Rust code and the assembly must contain static variables in special sections, the static variable must be initialized at compile time</strong>.</p>
+
+<p>This does not mean you cannot have static variable that stores a state which can only be known at runtime. This just means that you need to initialize static with compile-time known state or value. There is an easy way to store a value that can only be known at runtime utilizing a <code class="language-plaintext highlighter-rouge">enum</code> (variant) or something like <code class="language-plaintext highlighter-rouge">Option&lt;T&gt;</code> by setting them to a compile-time known value and updating them later at runtime.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Ok - initialized with compile-time known state/value.</span>
+<span class="k">static</span> <span class="k">mut</span> <span class="n">MEM</span><span class="p">:</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="nb">Box</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;&gt;</span> <span class="o">=</span> <span class="nb">None</span><span class="p">;</span>
+
+<span class="c1">// ....... somewhere ........ //</span>
+
+<span class="c1">// Ok</span>
+<span class="k">unsafe</span> <span class="p">{</span> <span class="n">MEM</span> <span class="o">=</span> <span class="nf">Some</span><span class="p">(</span><span class="nn">Box</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">5</span><span class="p">))</span> <span class="p">};</span>
+</code></pre></div></div>
+<p class="message">
+It is not recommended to use mutable static since it is quite easy to run into an undefined behavior with it.<br />
+I recommend using <a href="https://crates.io/crates/lazy_static">lazy_static</a> instead or checking end part of this article for slightly better implementation.
+</p>
+
+<p>As <em>one of Rust’s goals is to make concurrency bugs harder to run into</em>, reading or writing a mutable static is unsafe because static variables are shared between threads and a mutable static might run into race conditions in a concurrent program. This is why it is particularly important to guard a mutable static with lock. Also, for same reasons the type of non-mutable static variable should only allow thread safe access.</p>
+
+<p>Let us now move our focus to C++.</p>
+
+<h2 id="static-initialization-in-c">Static Initialization in C++</h2>
+
+<p>C++ allows initialization of a static variable even with a state which can only be known at runtime. This is possible mainly because of two reasons:</p>
+<ul>
+  <li>First, C++ allows uninitialized variables.</li>
+  <li>Second, C++ can do static initialization in runtime before main executes if necessary.</li>
+</ul>
+
+<p>Since C++ can carry out static initialization before the main method executes, it might lead to an extremely hard to detect problem known as <a href="https://www.cs.technion.ac.il/users/yechiel/c++-faq/static-init-order.html">the static initialization order fiasco</a>. It is also not clear if a variable is being initialized at compile time or at runtime. <a href="https://en.cppreference.com/w/cpp/20">C++20</a> solves this problem with <a href="https://en.cppreference.com/w/cpp/language/constinit">constinit</a>, which makes sure that a static variable can be initialized at compile-time. That being said, there is still no solution for the static initialization fiasco in C++.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="k">struct</span> <span class="nc">Test</span> <span class="p">{</span>
+   <span class="c1">// unique_pointer is a smart pointer similar to Box in rust.</span>
+   <span class="k">static</span> <span class="n">unique_pointer</span><span class="o">&lt;</span><span class="n">ComplexType</span><span class="o">&gt;</span> <span class="n">st_ptr</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="c1">// make_unique is similar to Box::new().</span>
+<span class="c1">// This runs before main to initialized static st_ptr.</span>
+<span class="n">Test</span><span class="o">::</span><span class="n">st_tpr</span> <span class="o">=</span> <span class="n">make_unique</span><span class="p">(</span><span class="n">ComplexType</span><span class="p">());</span>
+</code></pre></div></div>
+
+<p>In C++ local static variables (static variables declared inside a function, whose value is persistent across function calls) are initialized by the first function call, because of which they need to be implicitly provided with a lock guard by the compiler. This helps to avoid any race conditions that might occur during initialization, when two or more threads try to initialize the same local static variable.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">auto</span> <span class="nf">some_function</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">ComplexType</span> <span class="p">{</span>
+   <span class="c1">// First call to some_function initializes ct.</span>
+   <span class="c1">// Other calls will share the same ct initialized by the first call.</span>
+   <span class="c1">// Compiler adds lock guard to avoid any race conditions.</span>
+   <span class="k">static</span> <span class="n">ComplexType</span> <span class="n">ct</span> <span class="o">=</span> <span class="n">ComplexType</span><span class="p">();</span>
+
+   <span class="k">return</span> <span class="n">ct</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Rust solves all these issues that C++ suffers from by making mutable static variables unsafe and at the same time, allowing static variables to be initialized only with a state which can be known during compile-time.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="k">fn</span> <span class="nf">some_function</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="n">SomeStruct</span> <span class="p">{</span>
+   <span class="c1">// st is initialized at compile-time (data section set)</span>
+   <span class="c1">// all call share same st.</span>
+   <span class="k">static</span> <span class="n">SomeStruct</span> <span class="n">st</span> <span class="o">=</span> <span class="n">SomeStruct</span><span class="p">{</span> <span class="n">a</span><span class="p">:</span> <span class="mi">0</span> <span class="p">};</span>
+
+   <span class="k">return</span> <span class="n">st</span><span class="p">;</span>
+<span class="p">}</span>
+
+
+</code></pre></div></div>
+
+<p>Hence, when it comes to static variables, Rust has fairly good reasons to impose the restrictions on how a static variable can be initialized. However, we can easily bypass these restrictions and store pretty much anything in a static variable safely with the help of lock and proper abstraction.</p>
+
+<h2 id="better-example">Better Example</h2>
+
+<p>As promised, here is a better example for static variable that stores a value which can be only known at runtime. Try it live on <a href="https://godbolt.org/z/6xcGKzKEx">godbolt</a>.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">sync</span><span class="p">::</span><span class="n">Once</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">cell</span><span class="p">::</span><span class="n">Cell</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">hint</span><span class="p">::</span><span class="n">unreachable_unchecked</span><span class="p">;</span>
+
+<span class="k">struct</span> <span class="n">Test</span> <span class="p">{</span>
+  <span class="k">pub</span> <span class="n">a</span> <span class="p">:</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">fn</span> <span class="nf">get_static</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="o">&amp;</span><span class="k">'static</span> <span class="n">Test</span> <span class="p">{</span>
+
+   <span class="c1">// struct that stores our data + a lock guard</span>
+   <span class="k">struct</span> <span class="n">Stt</span> <span class="p">{</span>
+      <span class="n">data</span><span class="p">:</span> <span class="n">Cell</span><span class="o">&lt;</span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">Test</span><span class="o">&gt;&gt;</span><span class="p">,</span>
+      <span class="n">once</span><span class="p">:</span> <span class="n">Once</span> <span class="c1">// lock guard to make sure static is set only once</span>
+   <span class="p">}</span>
+
+   <span class="c1">// static variable type must have the Sync trait bound.</span>
+   <span class="c1">// and we also make sure that Stt can only be accessed in a thread safe manner.</span>
+   <span class="k">unsafe</span> <span class="k">impl</span> <span class="nb">Sync</span> <span class="k">for</span> <span class="n">Stt</span> <span class="p">{}</span>
+
+   <span class="c1">// static variable</span>
+   <span class="k">static</span> <span class="n">A</span><span class="p">:</span> <span class="n">Stt</span> <span class="o">=</span> <span class="n">Stt</span><span class="p">{</span><span class="n">data</span><span class="p">:</span> <span class="nn">Cell</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="nb">None</span><span class="p">),</span> <span class="n">once</span><span class="p">:</span> <span class="nn">Once</span><span class="p">::</span><span class="nf">new</span><span class="p">()</span> <span class="p">};</span>
+
+   <span class="c1">// lock, call_once makes sure that the block is execute only once</span>
+   <span class="n">A</span><span class="py">.once</span><span class="nf">.call_once</span><span class="p">(||</span> <span class="p">{</span>
+
+      <span class="c1">// init static with a state at runtime - Heap allocation</span>
+      <span class="n">A</span><span class="py">.data</span><span class="nf">.set</span><span class="p">(</span><span class="nf">Some</span><span class="p">(</span><span class="n">Test</span><span class="p">{</span><span class="n">a</span><span class="p">:</span> <span class="nn">Box</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">5</span><span class="p">)}));</span>
+   <span class="p">});</span>
+
+   <span class="c1">// get reference, dereferencing a raw pointer is unsafe</span>
+   <span class="k">let</span> <span class="n">v</span> <span class="o">=</span> <span class="k">unsafe</span> <span class="p">{</span> <span class="k">match</span> <span class="o">*</span><span class="n">A</span><span class="py">.data</span><span class="nf">.as_ptr</span><span class="p">()</span> <span class="p">{</span>
+      <span class="nf">Some</span><span class="p">(</span><span class="k">ref</span> <span class="n">a</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">a</span><span class="p">,</span>
+      <span class="nb">None</span> <span class="k">=&gt;</span> <span class="p">{</span>
+         <span class="c1">// unreachable code, we are sure that data is never None</span>
+         <span class="nf">unreachable_unchecked</span><span class="p">();</span>
+      <span class="p">}</span>
+   <span class="p">}};</span>
+
+   <span class="k">return</span> <span class="n">v</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+   <span class="k">let</span> <span class="n">a</span> <span class="o">=</span> <span class="nf">get_static</span><span class="p">();</span> <span class="c1">// reference to static</span>
+   <span class="k">let</span> <span class="n">b</span> <span class="o">=</span> <span class="nf">get_static</span><span class="p">();</span> <span class="c1">// another reference to static</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>In this example, we are using <code class="language-plaintext highlighter-rouge">Cell&lt;T&gt;</code> instead of <code class="language-plaintext highlighter-rouge">mut static</code> in order to update the state of the static variable once at runtime (on the first function call). This is much safer than the mutable static approach, we are also using a lock guard to avoid any race conditions.</p>
+
+<p>Also, since Rust doesn’t automatically derive <a href="https://doc.rust-lang.org/nomicon/send-and-sync.html">Sync trait</a> for our type <code class="language-plaintext highlighter-rouge">Stt</code> because of <code class="language-plaintext highlighter-rouge">Cell&lt;T&gt;</code>(<code class="language-plaintext highlighter-rouge">Cell&lt;T&gt;</code> is not thread safe type). We have to implement the <code class="language-plaintext highlighter-rouge">Sync</code> trait manually, and make sure that our type <code class="language-plaintext highlighter-rouge">Stt</code> can only be accessed in a thread safe manner.</p>
+
+<p>As I mentioned earlier, you should use <a href="https://crates.io/crates/lazy_static">lazy_static</a>. Under the hood, behind all its macro magic lazy_static also uses similar approach.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>Static variables in Rust are quite different from programming language such as C++, because they can be used in a much safer way. At first, it may seem like the Rust’s static variables are somewhat limited but with the help of library like <a href="https://crates.io/crates/lazy_static">lazy_static</a>, we can utilize static safely and effectively.</p>
+
+<p class="message">
+This is my first blog post, so I would love to receive some feedback. You can reach me at <a href="mailto:"></a>
+</p>]]></content><author><name>RiceFields</name></author><category term="code" /><category term="rust" /><summary type="html"><![CDATA[In this post I talk about static variables in Rust, compare them with static variables in C++. This post also tries to reason about the rules imposed by Rust on static variables and talks about why such rules are important.]]></summary></entry></feed>
