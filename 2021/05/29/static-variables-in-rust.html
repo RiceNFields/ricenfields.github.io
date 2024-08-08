@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Understanding Static Variables in Rust</title><!-- Begin Jekyll SEO tag v2.8.0 -->
+<meta name="generator" content="Jekyll v4.3.3" />
+<meta property="og:title" content="Understanding Static Variables in Rust" />
+<meta name="author" content="RiceFields" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="In this post I talk about static variables in Rust, compare them with static variables in C++. This post also tries to reason about the rules imposed by Rust on static variables and talks about why such rules are important." />
+<meta property="og:description" content="In this post I talk about static variables in Rust, compare them with static variables in C++. This post also tries to reason about the rules imposed by Rust on static variables and talks about why such rules are important." />
+<link rel="canonical" href="https://ricefields.me/2021/05/29/static-variables-in-rust.html" />
+<meta property="og:url" content="https://ricefields.me/2021/05/29/static-variables-in-rust.html" />
+<meta property="og:site_name" content="Rice Fields" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2021-05-29T00:00:00+07:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Understanding Static Variables in Rust" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"RiceFields","url":"https://twitter.com/RiceDotMe"},"dateModified":"2021-05-29T00:00:00+07:00","datePublished":"2021-05-29T00:00:00+07:00","description":"In this post I talk about static variables in Rust, compare them with static variables in C++. This post also tries to reason about the rules imposed by Rust on static variables and talks about why such rules are important.","headline":"Understanding Static Variables in Rust","mainEntityOfPage":{"@type":"WebPage","@id":"https://ricefields.me/2021/05/29/static-variables-in-rust.html"},"publisher":{"@type":"Organization","logo":{"@type":"ImageObject","url":"https://ricefields.me/logo.png"},"name":"RiceFields"},"url":"https://ricefields.me/2021/05/29/static-variables-in-rust.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link type="application/atom+xml" rel="alternate" href="https://ricefields.me/feed.xml" title="Rice Fields" /><link rel="shortcut icon" type="image/x-icon" href="" />
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head><body a="light">
+    <main class="page-content" aria-label="Content">
+      <div class="w">
+        <a href="/">..</a><article>
+  <p class="post-meta">
+    <time datetime="2021-05-29 00:00:00 +0700">2021-05-29</time>
+  </p>
+  
+  <h1>Understanding Static Variables in Rust</h1>
+
+  <p>Hello there, I hope you are doing ok. Today I would like to talk about static variables in Rust, compare them with static variables in C++ and also   try to reason about the rules imposed by Rust on static variables.</p>
+
+<h2 id="introduction">Introduction</h2>
+<p>Static variable are variables declared with a <code class="language-plaintext highlighter-rouge">static</code> keyword and represent a specific global memory location (They are also known as global variables). Static variables have static life-time, a static life-time never goes out of scope and is guaranteed to out live any other variable. Meaning even if they are declared inside a scope their life-time does not begin or end with the scope.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fn</span> <span class="nf">func</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="o">&amp;</span><span class="k">'static</span> <span class="n">i23</span> <span class="p">{</span>
+   <span class="c1">// global variable, same global memory location for every call.</span>
+   <span class="k">static</span> <span class="n">SOMETHING</span><span class="p">:</span> <span class="nb">i32</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+   <span class="k">return</span> <span class="o">&amp;</span><span class="n">SOMETHING</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// every call to func() returns reference to same memory location.</span>
+<span class="nf">func</span><span class="p">()</span>
+<span class="nf">func</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>In Rust,</p>
+<ul>
+  <li><em>static variables must be initialized at compile-time</em> (Meaning they cannot be initialized with state which can only be known at runtime),</li>
+  <li><em>The type of static variable must have the <a href="https://doc.rust-lang.org/nomicon/send-and-sync.html">Sync trait</a> bound</em> (Meaning the type should be safe to share between threads, <code class="language-plaintext highlighter-rouge">Sync</code> is an automatically derived trait with some exceptions) and</li>
+  <li><em>mutating a static variable is only possible in an unsafe context</em>.</li>
+</ul>
+
+<p>In this post we’ll try to reason about these rules that are imposed by Rust on the static variables and also talk about why such rules are important.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// OK - 0 can be known at complete time.</span>
+<span class="k">static</span> <span class="n">SOME_THING</span><span class="p">:</span> <span class="nb">i32</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="c1">// Error heap allocation is only possible in runtime.</span>
+<span class="k">static</span> <span class="n">MEM</span><span class="p">:</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;</span> <span class="o">=</span> <span class="nn">Box</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>To understand rules behind static variables let us take a short dive into the land of assembly.</p>
+
+<h2 id="land-of-assembly">Land of Assembly</h2>
+<p>Rust is a native language that compiles down to assembly. An assembly program is generally divided into three sections:</p>
+
+<ul>
+  <li>data</li>
+  <li>bss</li>
+  <li>text</li>
+</ul>
+
+<p>The <code class="language-plaintext highlighter-rouge">data</code> section contains all the initialized static variables with their initial value, <code class="language-plaintext highlighter-rouge">bss</code> section contains all uninitialized/zero-initialized static variables and finally the <code class="language-plaintext highlighter-rouge">text</code> section contains all our code in assembly. You can read more about assembly layout <a href="https://en.wikipedia.org/wiki/Data_segment">here</a>. (This stuff is platform dependent so take it with a grain of salt.)</p>
+
+<h2 id="back-to-rust">Back to Rust</h2>
+
+<p>Rust does not allow uninitialized static variables. So, the data, bss section may contain either initialized or zero-initialized static variables. Also, <strong>since assembly is generated after compiling the Rust code and the assembly must contain static variables in special sections, the static variable must be initialized at compile time</strong>.</p>
+
+<p>This does not mean you cannot have static variable that stores a state which can only be known at runtime. This just means that you need to initialize static with compile-time known state or value. There is an easy way to store a value that can only be known at runtime utilizing a <code class="language-plaintext highlighter-rouge">enum</code> (variant) or something like <code class="language-plaintext highlighter-rouge">Option&lt;T&gt;</code> by setting them to a compile-time known value and updating them later at runtime.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Ok - initialized with compile-time known state/value.</span>
+<span class="k">static</span> <span class="k">mut</span> <span class="n">MEM</span><span class="p">:</span> <span class="nb">Option</span><span class="o">&lt;</span><span class="nb">Box</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;&gt;</span> <span class="o">=</span> <span class="nb">None</span><span class="p">;</span>
+
+<span class="c1">// ....... somewhere ........ //</span>
+
+<span class="c1">// Ok</span>
+<span class="k">unsafe</span> <span class="p">{</span> <span class="n">MEM</span> <span class="o">=</span> <span class="nf">Some</span><span class="p">(</span><span class="nn">Box</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">5</span><span class="p">))</span> <span class="p">};</span>
+</code></pre></div></div>
+<p class="message">
+It is not recommended to use mutable static since it is quite easy to run into an undefined behavior with it.<br />
+I recommend using <a href="https://crates.io/crates/lazy_static">lazy_static</a> instead or checking end part of this article for slightly better implementation.
+</p>
+
+<p>As <em>one of Rust’s goals is to make concurrency bugs harder to run into</em>, reading or writing a mutable static is unsafe because static variables are shared between threads and a mutable static might run into race conditions in a concurrent program. This is why it is particularly important to guard a mutable static with lock. Also, for same reasons the type of non-mutable static variable should only allow thread safe access.</p>
+
+<p>Let us now move our focus to C++.</p>
+
+<h2 id="static-initialization-in-c">Static Initialization in C++</h2>
+
+<p>C++ allows initialization of a static variable even with a state which can only be known at runtime. This is possible mainly because of two reasons:</p>
+<ul>
+  <li>First, C++ allows uninitialized variables.</li>
+  <li>Second, C++ can do static initialization in runtime before main executes if necessary.</li>
+</ul>
+
+<p>Since C++ can carry out static initialization before the main method executes, it might lead to an extremely hard to detect problem known as <a href="https://www.cs.technion.ac.il/users/yechiel/c++-faq/static-init-order.html">the static initialization order fiasco</a>. It is also not clear if a variable is being initialized at compile time or at runtime. <a href="https://en.cppreference.com/w/cpp/20">C++20</a> solves this problem with <a href="https://en.cppreference.com/w/cpp/language/constinit">constinit</a>, which makes sure that a static variable can be initialized at compile-time. That being said, there is still no solution for the static initialization fiasco in C++.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="k">struct</span> <span class="nc">Test</span> <span class="p">{</span>
+   <span class="c1">// unique_pointer is a smart pointer similar to Box in rust.</span>
+   <span class="k">static</span> <span class="n">unique_pointer</span><span class="o">&lt;</span><span class="n">ComplexType</span><span class="o">&gt;</span> <span class="n">st_ptr</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="c1">// make_unique is similar to Box::new().</span>
+<span class="c1">// This runs before main to initialized static st_ptr.</span>
+<span class="n">Test</span><span class="o">::</span><span class="n">st_tpr</span> <span class="o">=</span> <span class="n">make_unique</span><span class="p">(</span><span class="n">ComplexType</span><span class="p">());</span>
+</code></pre></div></div>
+
+<p>In C++ local static variables (static variables declared inside a function, whose value is persistent across function calls) are initialized by the first function call, because of which they need to be implicitly provided with a lock guard by the compiler. This helps to avoid any race conditions that might occur during initialization, when two or more threads try to initialize the same local static variable.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">auto</span> <span class="nf">some_function</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">ComplexType</span> <span class="p">{</span>
+   <span class="c1">// First call to some_function initializes ct.</span>
+   <span class="c1">// Other calls will share the same ct initialized by the first call.</span>
+   <span class="c1">// Compiler adds lock guard to avoid any race conditions.</span>
+   <span class="k">static</span> <span class="n">ComplexType</span> <span class="n">ct</span> <span class="o">=</span> <span class="n">ComplexType</span><span class="p">();</span>
+
+   <span class="k">return</span> <span class="n">ct</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Rust solves all these issues that C++ suffers from by making mutable static variables unsafe and at the same time, allowing static variables to be initialized only with a state which can be known during compile-time.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="k">fn</span> <span class="nf">some_function</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="n">SomeStruct</span> <span class="p">{</span>
+   <span class="c1">// st is initialized at compile-time (data section set)</span>
+   <span class="c1">// all call share same st.</span>
+   <span class="k">static</span> <span class="n">SomeStruct</span> <span class="n">st</span> <span class="o">=</span> <span class="n">SomeStruct</span><span class="p">{</span> <span class="n">a</span><span class="p">:</span> <span class="mi">0</span> <span class="p">};</span>
+
+   <span class="k">return</span> <span class="n">st</span><span class="p">;</span>
+<span class="p">}</span>
+
+
+</code></pre></div></div>
+
+<p>Hence, when it comes to static variables, Rust has fairly good reasons to impose the restrictions on how a static variable can be initialized. However, we can easily bypass these restrictions and store pretty much anything in a static variable safely with the help of lock and proper abstraction.</p>
+
+<h2 id="better-example">Better Example</h2>
+
+<p>As promised, here is a better example for static variable that stores a value which can be only known at runtime. Try it live on <a href="https://godbolt.org/z/6xcGKzKEx">godbolt</a>.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">sync</span><span class="p">::</span><span class="n">Once</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">cell</span><span class="p">::</span><span class="n">Cell</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">hint</span><span class="p">::</span><span class="n">unreachable_unchecked</span><span class="p">;</span>
+
+<span class="k">struct</span> <span class="n">Test</span> <span class="p">{</span>
+  <span class="k">pub</span> <span class="n">a</span> <span class="p">:</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="nb">i32</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">fn</span> <span class="nf">get_static</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="o">&amp;</span><span class="k">'static</span> <span class="n">Test</span> <span class="p">{</span>
+
+   <span class="c1">// struct that stores our data + a lock guard</span>
+   <span class="k">struct</span> <span class="n">Stt</span> <span class="p">{</span>
+      <span class="n">data</span><span class="p">:</span> <span class="n">Cell</span><span class="o">&lt;</span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">Test</span><span class="o">&gt;&gt;</span><span class="p">,</span>
+      <span class="n">once</span><span class="p">:</span> <span class="n">Once</span> <span class="c1">// lock guard to make sure static is set only once</span>
+   <span class="p">}</span>
+
+   <span class="c1">// static variable type must have the Sync trait bound.</span>
+   <span class="c1">// and we also make sure that Stt can only be accessed in a thread safe manner.</span>
+   <span class="k">unsafe</span> <span class="k">impl</span> <span class="nb">Sync</span> <span class="k">for</span> <span class="n">Stt</span> <span class="p">{}</span>
+
+   <span class="c1">// static variable</span>
+   <span class="k">static</span> <span class="n">A</span><span class="p">:</span> <span class="n">Stt</span> <span class="o">=</span> <span class="n">Stt</span><span class="p">{</span><span class="n">data</span><span class="p">:</span> <span class="nn">Cell</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="nb">None</span><span class="p">),</span> <span class="n">once</span><span class="p">:</span> <span class="nn">Once</span><span class="p">::</span><span class="nf">new</span><span class="p">()</span> <span class="p">};</span>
+
+   <span class="c1">// lock, call_once makes sure that the block is execute only once</span>
+   <span class="n">A</span><span class="py">.once</span><span class="nf">.call_once</span><span class="p">(||</span> <span class="p">{</span>
+
+      <span class="c1">// init static with a state at runtime - Heap allocation</span>
+      <span class="n">A</span><span class="py">.data</span><span class="nf">.set</span><span class="p">(</span><span class="nf">Some</span><span class="p">(</span><span class="n">Test</span><span class="p">{</span><span class="n">a</span><span class="p">:</span> <span class="nn">Box</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">5</span><span class="p">)}));</span>
+   <span class="p">});</span>
+
+   <span class="c1">// get reference, dereferencing a raw pointer is unsafe</span>
+   <span class="k">let</span> <span class="n">v</span> <span class="o">=</span> <span class="k">unsafe</span> <span class="p">{</span> <span class="k">match</span> <span class="o">*</span><span class="n">A</span><span class="py">.data</span><span class="nf">.as_ptr</span><span class="p">()</span> <span class="p">{</span>
+      <span class="nf">Some</span><span class="p">(</span><span class="k">ref</span> <span class="n">a</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">a</span><span class="p">,</span>
+      <span class="nb">None</span> <span class="k">=&gt;</span> <span class="p">{</span>
+         <span class="c1">// unreachable code, we are sure that data is never None</span>
+         <span class="nf">unreachable_unchecked</span><span class="p">();</span>
+      <span class="p">}</span>
+   <span class="p">}};</span>
+
+   <span class="k">return</span> <span class="n">v</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+   <span class="k">let</span> <span class="n">a</span> <span class="o">=</span> <span class="nf">get_static</span><span class="p">();</span> <span class="c1">// reference to static</span>
+   <span class="k">let</span> <span class="n">b</span> <span class="o">=</span> <span class="nf">get_static</span><span class="p">();</span> <span class="c1">// another reference to static</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>In this example, we are using <code class="language-plaintext highlighter-rouge">Cell&lt;T&gt;</code> instead of <code class="language-plaintext highlighter-rouge">mut static</code> in order to update the state of the static variable once at runtime (on the first function call). This is much safer than the mutable static approach, we are also using a lock guard to avoid any race conditions.</p>
+
+<p>Also, since Rust doesn’t automatically derive <a href="https://doc.rust-lang.org/nomicon/send-and-sync.html">Sync trait</a> for our type <code class="language-plaintext highlighter-rouge">Stt</code> because of <code class="language-plaintext highlighter-rouge">Cell&lt;T&gt;</code>(<code class="language-plaintext highlighter-rouge">Cell&lt;T&gt;</code> is not thread safe type). We have to implement the <code class="language-plaintext highlighter-rouge">Sync</code> trait manually, and make sure that our type <code class="language-plaintext highlighter-rouge">Stt</code> can only be accessed in a thread safe manner.</p>
+
+<p>As I mentioned earlier, you should use <a href="https://crates.io/crates/lazy_static">lazy_static</a>. Under the hood, behind all its macro magic lazy_static also uses similar approach.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+<p>Static variables in Rust are quite different from programming language such as C++, because they can be used in a much safer way. At first, it may seem like the Rust’s static variables are somewhat limited but with the help of library like <a href="https://crates.io/crates/lazy_static">lazy_static</a>, we can utilize static safely and effectively.</p>
+
+<p class="message">
+This is my first blog post, so I would love to receive some feedback. You can reach me at <a href="mailto:"></a>
+</p>
+
+</article>
+
+      </div>
+    </main>
+
+    
+  </body>
+</html>

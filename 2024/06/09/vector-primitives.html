@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>SIMD - Vector Primitives and Operations</title><!-- Begin Jekyll SEO tag v2.8.0 -->
+<meta name="generator" content="Jekyll v4.3.3" />
+<meta property="og:title" content="SIMD - Vector Primitives and Operations" />
+<meta name="author" content="RiceFields" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Brief overview on SIMD (Single Instruction, Multiple Data) vector primitives and operations supported by modern languages." />
+<meta property="og:description" content="Brief overview on SIMD (Single Instruction, Multiple Data) vector primitives and operations supported by modern languages." />
+<link rel="canonical" href="https://ricefields.me/2024/06/09/vector-primitives.html" />
+<meta property="og:url" content="https://ricefields.me/2024/06/09/vector-primitives.html" />
+<meta property="og:site_name" content="Rice Fields" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2024-06-09T00:00:00+07:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="SIMD - Vector Primitives and Operations" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"RiceFields","url":"https://twitter.com/RiceDotMe"},"dateModified":"2024-06-09T00:00:00+07:00","datePublished":"2024-06-09T00:00:00+07:00","description":"Brief overview on SIMD (Single Instruction, Multiple Data) vector primitives and operations supported by modern languages.","headline":"SIMD - Vector Primitives and Operations","mainEntityOfPage":{"@type":"WebPage","@id":"https://ricefields.me/2024/06/09/vector-primitives.html"},"publisher":{"@type":"Organization","logo":{"@type":"ImageObject","url":"https://ricefields.me/logo.png"},"name":"RiceFields"},"url":"https://ricefields.me/2024/06/09/vector-primitives.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link type="application/atom+xml" rel="alternate" href="https://ricefields.me/feed.xml" title="Rice Fields" /><link rel="shortcut icon" type="image/x-icon" href="" />
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head><body a="light">
+    <main class="page-content" aria-label="Content">
+      <div class="w">
+        <a href="/">..</a><article>
+  <p class="post-meta">
+    <time datetime="2024-06-09 00:00:00 +0700">2024-06-09</time>
+  </p>
+  
+  <h1>SIMD - Vector Primitives and Operations</h1>
+
+  <p>For quite a while, all major CPU architectures have included support for SIMD instruction sets. Consequently, system programming languages are now beginning to offer support for SIMD, either through libraries or as first-class language primitives. SIMD provides an optimization window for modern software through <a href="https://en.wikipedia.org/wiki/Data_parallelism#Description">data parallelism</a>, greatly accelerating computation. This article aims to provide a detailed overview of SIMD vector primitives and operations supported by modern languages, along with some real-world examples.</p>
+
+<h2 id="simd-single-instruction-multiple-data">SIMD (Single Instruction, Multiple Data)</h2>
+<p>SIMD stands for Single Instruction Multiple Data, which basically boils down to applying the same operation on multiple data or an array of primitives (such as integers, floats, or boolean masks). Let’s explore this concept deeper with an example.</p>
+
+<p>Consider a mathematical vector with four components. If we want to perform element-wise addition of these vectors, it requires four separate addition operations.</p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">v1</span><span class="p">:</span> <span class="p">[</span><span class="nb">f32</span><span class="p">;</span> <span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">];</span>
+<span class="k">let</span> <span class="n">v2</span><span class="p">:</span> <span class="p">[</span><span class="nb">f32</span><span class="p">;</span> <span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">];</span>
+
+<span class="k">let</span> <span class="n">add</span><span class="p">:</span> <span class="p">[</span><span class="nb">f32</span><span class="p">;</span> <span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">v1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+    <span class="n">v1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+    <span class="n">v1</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+    <span class="n">v1</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+<span class="p">];</span>
+</code></pre></div></div>
+<p>In the example, we’re performing element-wise addition on two float arrays. Imagine if there were native support for directly adding float arrays like this. That’s exactly what SIMD provides: the ability to execute a single operation, such as addition in our case, on multiple values, like two float arrays with 4 elements each.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="n">f32x4</span><span class="p">;</span>
+
+<span class="c1">//....</span>
+
+<span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">]);</span>
+
+<span class="k">let</span> <span class="n">add</span> <span class="o">=</span> <span class="n">v1</span> <span class="o">+</span> <span class="n">v2</span><span class="p">;</span>
+</code></pre></div></div>
+<p>This is a SIMD version of our example. In SIMD addition of two vectors, multiple operations are combined into a single one. There are no loops under the hood, as long as the target CPU supports SIMD. We’re essentially applying the same operation on multiple data in parallel, which is simply known as data-level parallelism. Instead of four separate add operations, we’re adding four numbers in parallel. This can significantly improve performance in software that deals with a lot of calculation or processing sequential data.</p>
+
+<h2 id="vector-registers">Vector Registers</h2>
+<p>SIMD operations are backed by vector registers, which are registers capable of holding 128, 256 or even 512 bits of data. We have the ability to perform operations on these registers, such as our example above, where we use two 128-bit registers to add two arrays of 32-bit floats.</p>
+
+<p><img src="/assets/images/simd/simd_reg.webp" alt="Simd Add Registers" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p><img src="/assets/images/simd/simd_add.webp" alt="Simd Add" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>Modern system programming languages provide support for these registers through vector primitives or structs such as <code class="language-plaintext highlighter-rouge">f32x4</code> in Rust, <code class="language-plaintext highlighter-rouge">@Vector</code> in Zig, and <code class="language-plaintext highlighter-rouge">std::native_simd&lt;float&gt;</code> in C++. 
+For documentation on SIMD support in each of these languages, you can follow the hyperlinks:
+<a href="https://doc.rust-lang.org/std/simd/index.html">Rust</a>, <a href="https://ziglang.org/documentation/master/#Vectors">Zig</a>, <a href="https://en.cppreference.com/w/cpp/experimental/simd">C++</a>.</p>
+
+<p>These vector registers also support 64-bit floating-point and integer data types, as well as boolean masks ranging from 8-bit to 64-bit per element.</p>
+
+<h4 id="cpu-support">CPU Support</h4>
+<p>Not all CPUs support vector registers, especially the larger ones like 512-bit. However, all widely used CPU architectures
+do support 128-bit vector registers, making it important for programmers to be aware of their availability and utilize them effectively. In this article we’ll mainly work with 128-bit register as they are widely supported. Here are the documentations for 128-bit SIMD support on various architectures:</p>
+<ul>
+  <li><a href="https://en.wikipedia.org/wiki/SSE4">x86</a></li>
+  <li><a href="https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)">Arm</a></li>
+  <li><a href="https://en.wikipedia.org/wiki/AltiVec">PowerPc</a></li>
+  <li><a href="https://en.wikipedia.org/wiki/MIPS_architecture">MIPS</a></li>
+</ul>
+
+<h2 id="vector-operations">Vector Operations</h2>
+<p>Let’s go through some of the fundamental operations you can perform with these vector registers:</p>
+
+<h4 id="arithmetic">Arithmetic</h4>
+<p>These don’t need any explanation; they are just your old regular arithmetic operations. The only difference being, in the case of SIMD vectors, they’re element-wise operations. So, if you multiply, add, divide, or subtract two SIMD vectors, the operations will be done element-wise. Here’s a simple diagram for multiplication; all other operations work the same way.</p>
+
+<p><img src="/assets/images/simd/simd_mul.webp" alt="Simd Mul" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<h4 id="comparison-logical-and-masks">Comparison, Logical and Masks</h4>
+<p>Like regular primitives, SIMD vectors also support logical (AND, OR, NOT, XOR) and comparison (EQUAL, LESS, GREATER) operations. However, they work slightly differently because we’re operating on multiple values simultaneously.</p>
+
+<p>The comparison operation returns a packed bitmask, where four 32-bit masks are packed into a single 128-bit SIMD vector. Each mask contains all 1’s for true and all 0’s for false. For example, SIMD A &gt; B essentially boils down to the following pseudo code. Additionally, it’s worth noting that these masks are stored and represented as a set of integers (four 32-bit ints in our example).</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">]</span>
+<span class="n">B</span> <span class="o">=</span> <span class="p">[</span><span class="n">b0</span><span class="p">,</span> <span class="n">b1</span><span class="p">,</span> <span class="n">b2</span><span class="p">,</span> <span class="n">b3</span><span class="p">]</span>
+
+<span class="c1">// M = A &gt; B</span>
+<span class="n">Mask</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="n">a0</span> <span class="o">&gt;</span> <span class="n">b0</span><span class="p">)</span> <span class="o">?</span> <span class="mh">0xFFFFFFFF</span> <span class="o">:</span> <span class="mh">0x00000000</span><span class="p">,</span>
+    <span class="p">(</span><span class="n">a1</span> <span class="o">&gt;</span> <span class="n">b1</span><span class="p">)</span> <span class="o">?</span> <span class="mh">0xFFFFFFFF</span> <span class="o">:</span> <span class="mh">0x00000000</span><span class="p">,</span>
+    <span class="p">(</span><span class="n">a2</span> <span class="o">&gt;</span> <span class="n">b2</span><span class="p">)</span> <span class="o">?</span> <span class="mh">0xFFFFFFFF</span> <span class="o">:</span> <span class="mh">0x00000000</span><span class="p">,</span>
+    <span class="p">(</span><span class="n">a3</span> <span class="o">&gt;</span> <span class="n">b3</span><span class="p">)</span> <span class="o">?</span> <span class="mh">0xFFFFFFFF</span> <span class="o">:</span> <span class="mh">0x00000000</span><span class="p">,</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p>The logical operations like arithmetic are applied element wise.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">]</span>
+<span class="n">B</span> <span class="o">=</span> <span class="p">[</span><span class="n">b0</span><span class="p">,</span> <span class="n">b1</span><span class="p">,</span> <span class="n">b2</span><span class="p">,</span> <span class="n">b3</span><span class="p">]</span>
+
+<span class="c1">// M = B | A</span>
+<span class="n">M</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">a0</span> <span class="o">|</span> <span class="n">b0</span><span class="p">,</span>    
+    <span class="n">a1</span> <span class="o">|</span> <span class="n">b1</span><span class="p">,</span>
+    <span class="n">a2</span> <span class="o">|</span> <span class="n">b2</span><span class="p">,</span>
+    <span class="n">a3</span> <span class="o">|</span> <span class="n">b3</span><span class="p">,</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<h4 id="data-movement">Data Movement</h4>
+<p>Data movement involves swizzling or shuffling, where you can create a new SIMD vector by combining two input vectors based on a user-defined mask. For example:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">]</span>
+<span class="n">B</span> <span class="o">=</span> <span class="p">[</span><span class="n">b0</span><span class="p">,</span> <span class="n">b1</span><span class="p">,</span> <span class="n">b2</span><span class="p">,</span> <span class="n">b3</span><span class="p">]</span>
+
+<span class="n">R</span> <span class="o">=</span> <span class="n">shuffle</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">])</span> <span class="c1">// M = [a0, a1, b2, b3]</span>
+</code></pre></div></div>
+<p>Here, we are copying the first two elements (a0, a1) from A and the last two elements (b2, b3) from B based on our mask <code class="language-plaintext highlighter-rouge">[0, 1, 6, 7]</code>. The mask is represented by an array of indices from the concatenation of A and B, i.e. <code class="language-plaintext highlighter-rouge">[a0, a1, a2, a3, b0, b1, b2, b3]</code>.</p>
+
+<p>The representation of the mask differs based on the programming language and its SIMD library. Rust uses concatenated array indices for masks, while Zig uses positive indices to select elements from the first input and negative indices to select elements from the second input.</p>
+
+<p>Rust example, rust uses the term swizzle for data movement operation. <a href="https://doc.rust-lang.org/nightly/std/simd/macro.simd_swizzle.html">Rust Docs</a></p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">]);</span>
+
+<span class="k">let</span> <span class="n">m</span><span class="p">:</span> <span class="n">f32x4</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">]);</span> <span class="c1">// m = [1.0, 2.0, 7.0, 8.0]</span>
+</code></pre></div></div>
+
+<p>Zig example, zig uses negative indices for masks. <a href="https://ziglang.org/documentation/master/#shuffle">Zig Docs</a></p>
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">const</span> <span class="n">v1</span> <span class="o">=</span> <span class="nb">@Vector</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="kt">f32</span><span class="p">){</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">};</span>
+<span class="k">const</span> <span class="n">v2</span> <span class="o">=</span> <span class="nb">@Vector</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="kt">f32</span><span class="p">){</span><span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">};</span>
+
+<span class="k">const</span> <span class="n">m</span> <span class="o">=</span> <span class="nb">@shuffle</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="p">[</span><span class="mi">_</span><span class="p">]</span><span class="kt">i32</span><span class="p">{</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="o">-</span><span class="mi">4</span><span class="p">});</span> <span class="c">// m = [1.0, 2.0, 7.0, 6.0]</span>
+</code></pre></div></div>
+
+<p>You can also rearrange the order of elements in a SIMD vector using shuffle/swizzle operations.</p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="n">f32x4</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="n">simd_swizzle</span><span class="p">;</span>
+
+<span class="c1">// ...</span>
+
+<span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v1</span><span class="p">,</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]);</span> <span class="c1">// v2 = [4.0, 1.0, 3.0, 2.0]</span>
+</code></pre></div></div>
+
+<h4 id="reduction">Reduction</h4>
+<p>Until now, all the vector operations we explored were mostly element-wise operations on two input vectors, known as vertical operations. Another type of operation we can perform is among the elements in the same SIMD vector, known as horizontal operation. For example, adding all elements to a single 32-bit float value, i.e., reducing to a single value.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">A</span> <span class="o">=</span> <span class="p">[</span><span class="n">a0</span><span class="p">,</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span><span class="p">];</span>
+
+<span class="n">r</span> <span class="o">=</span> <span class="n">a0</span> <span class="o">+</span> <span class="n">a1</span> <span class="o">+</span> <span class="n">a2</span> <span class="o">+</span> <span class="n">a3</span> <span class="p">;</span> <span class="c1">// reduce sum</span>
+</code></pre></div></div>
+
+<p>All three languages offer macros or helper functions for reduction.</p>
+
+<p>Rust example, <a href="https://doc.rust-lang.org/std/simd/num/trait.SimdFloat.html#tymethod.reduce_sum">Rust Docs</a></p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="n">f32x4</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">simd</span><span class="p">::</span><span class="nn">num</span><span class="p">::</span><span class="n">SimdFloat</span><span class="p">;</span>
+
+<span class="c1">//....</span>
+
+<span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">sum</span> <span class="o">=</span> <span class="n">v1</span><span class="nf">.reduce_sum</span><span class="p">();</span> <span class="c1">// 10</span>
+</code></pre></div></div>
+
+<p>Zig example, <a href="https://ziglang.org/documentation/master/#reduce">Zig Docs</a></p>
+<div class="language-zig highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="k">const</span> <span class="n">v1</span> <span class="o">=</span> <span class="nb">@Vector</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="kt">f32</span><span class="p">){</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">};</span>
+<span class="k">const</span> <span class="n">sum</span> <span class="o">=</span> <span class="n">@reduce</span><span class="p">(.</span><span class="py">Add</span><span class="p">,</span> <span class="n">v1</span><span class="p">);</span> <span class="c">// 10</span>
+</code></pre></div></div>
+
+<h2 id="practical-examples">Practical Examples</h2>
+<p>Now, let’s explore some practical use cases for these SIMD vectors and operations we’ve just covered.</p>
+
+<h4 id="dot-product">Dot Product</h4>
+<p>The dot product is a mathematical operation on vectors that involves element-wise multiplication followed by the summation of the elements of the multiplication result.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">v1</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">]);</span>
+<span class="k">let</span> <span class="n">v2</span> <span class="o">=</span> <span class="nn">f32x4</span><span class="p">::</span><span class="nf">from_array</span><span class="p">([</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">3.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">4.0</span><span class="p">]);</span>
+
+<span class="k">let</span> <span class="n">dot_product</span> <span class="o">=</span> <span class="p">(</span><span class="n">v1</span> <span class="o">*</span> <span class="n">v2</span><span class="p">)</span><span class="nf">.reduce_sum</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>Similarly, SIMD can be applied to other linear algebra operations such as matrix multiplication, transposition, decomposition, etc. Vectors and matrices are widely used in computer graphics and image processing, making SIMD essential for accelerating computation in these areas</p>
+
+<h4 id="sarrus-rule">Sarrus Rule</h4>
+<p>Sarrus rule is another mathematical operation often used to calculate the determinant of a 3x3 matrix or the cross product of two 3D vectors.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// 3x3 matrix, assuming the 4th component to be zero</span>
+<span class="k">fn</span> <span class="nf">determinant</span><span class="p">(</span><span class="n">mat</span><span class="p">:</span> <span class="p">[</span><span class="n">f32x4</span><span class="p">;</span> <span class="mi">3</span><span class="p">])</span> <span class="k">-&gt;</span> <span class="nb">f32</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">m0</span> <span class="o">=</span> <span class="n">mat</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="o">*</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="o">*</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+
+    <span class="k">let</span> <span class="n">m1</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="o">*</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="o">*</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">mat</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">m0</span> <span class="o">-</span> <span class="n">m1</span><span class="p">)</span><span class="nf">.reduce_sum</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c1">// Assuming the 4th element to be 0 for both a and b</span>
+<span class="k">fn</span> <span class="nf">cross</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">f32x4</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">f32x4</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="n">f32x4</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">temp0</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+    <span class="k">let</span> <span class="n">temp1</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+    <span class="k">let</span> <span class="n">temp2</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+    <span class="k">let</span> <span class="n">temp3</span> <span class="o">=</span> <span class="nd">simd_swizzle!</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]);</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">temp0</span> <span class="o">*</span> <span class="n">temp3</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">temp2</span> <span class="o">*</span> <span class="n">temp1</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p><a href="https://godbolt.org/z/nn66s6zr7">Example on Compiler Explorer</a></p>
+
+<h4 id="string-search">String Search</h4>
+<p>At this point, it’s pretty clear that SIMD can be effectively utilized to optimize mathematical calculations. But what about other use cases? Another area where SIMD has proven its effectiveness is in parsing data. SIMD can significantly speed up something like JSON parsing. Take a look at the benchmark on <a href="https://github.com/simdjson/simdjson">simdjson</a>.</p>
+
+<p>Let’s return to our string search example. When searching for a substring in a lengthy text, we can leverage SIMD vectors to compare multiple bytes simultaneously, allowing us to implement more efficient string searching algorithms.</p>
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Assuming the string are ASCII 8-bit each</span>
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">contains_substr</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">,</span> <span class="n">substr</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">bool</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="n">substr</span><span class="nf">.is_empty</span><span class="p">()</span> <span class="p">||</span> <span class="n">substr</span><span class="nf">.len</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">text</span><span class="nf">.len</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="k">false</span><span class="p">;</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="n">substr_bytes</span> <span class="o">=</span> <span class="n">substr</span><span class="nf">.as_bytes</span><span class="p">();</span>
+        <span class="k">let</span> <span class="n">substr_len</span> <span class="o">=</span> <span class="n">substr_bytes</span><span class="nf">.len</span><span class="p">();</span>
+
+        <span class="k">let</span> <span class="n">first_char</span> <span class="o">=</span> <span class="n">substr_bytes</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+        <span class="k">let</span> <span class="n">last_char</span> <span class="o">=</span> <span class="n">substr_bytes</span><span class="p">[</span><span class="n">substr_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">];</span>
+
+        <span class="c1">// fingerprint from first and last character of the substring</span>
+        <span class="k">let</span> <span class="n">first_fing</span> <span class="o">=</span> <span class="nn">u8x16</span><span class="p">::</span><span class="nf">splat</span><span class="p">(</span><span class="n">first_char</span><span class="nf">.try_into</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">());</span>
+        <span class="k">let</span> <span class="n">last_fing</span> <span class="o">=</span> <span class="nn">u8x16</span><span class="p">::</span><span class="nf">splat</span><span class="p">(</span><span class="n">last_char</span><span class="nf">.try_into</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">());</span>
+
+        <span class="c1">// create 16-byte chunks for figerprint checks</span>
+        <span class="k">let</span> <span class="n">text_bytes</span> <span class="o">=</span> <span class="nf">pad_text</span><span class="p">(</span><span class="n">text</span><span class="nf">.as_bytes</span><span class="p">(),</span> <span class="n">substr_len</span><span class="p">);</span>
+        <span class="k">let</span> <span class="n">total_chunks</span> <span class="o">=</span> <span class="n">text_bytes</span><span class="nf">.len</span><span class="p">()</span> <span class="o">/</span> <span class="mi">16</span><span class="p">;</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">chunk</span><span class="p">)</span> <span class="k">in</span> <span class="n">text_bytes</span><span class="nf">.chunks</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span><span class="nf">.enumerate</span><span class="p">()</span><span class="nf">.take</span><span class="p">(</span><span class="n">total_chunks</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// blocks to compare fingerprints with</span>
+            <span class="k">let</span> <span class="n">first_block</span> <span class="o">=</span> <span class="nn">u8x16</span><span class="p">::</span><span class="nf">from_slice</span><span class="p">(</span><span class="n">chunk</span><span class="p">);</span>
+            <span class="c1">// second_block start from start + offset where offset = substr_len - 1</span>
+            <span class="k">let</span> <span class="n">sb_start</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="mi">16</span><span class="p">)</span> <span class="o">+</span> <span class="n">substr_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+            <span class="k">let</span> <span class="n">second_block</span> <span class="o">=</span> <span class="nn">u8x16</span><span class="p">::</span><span class="nf">from_slice</span><span class="p">(</span><span class="o">&amp;</span><span class="n">text_bytes</span><span class="p">[</span><span class="n">sb_start</span><span class="o">..</span><span class="n">sb_start</span> <span class="o">+</span> <span class="mi">16</span><span class="p">]);</span>
+
+            <span class="k">let</span> <span class="n">eq_a</span> <span class="o">=</span> <span class="n">first_block</span><span class="nf">.simd_eq</span><span class="p">(</span><span class="n">first_fing</span><span class="p">);</span>
+            <span class="k">let</span> <span class="n">eq_b</span> <span class="o">=</span> <span class="n">last_fing</span><span class="nf">.simd_eq</span><span class="p">(</span><span class="n">second_block</span><span class="p">);</span>
+
+            <span class="k">let</span> <span class="k">mut</span> <span class="n">mask</span> <span class="o">=</span> <span class="n">eq_a</span> <span class="o">&amp;</span> <span class="n">eq_b</span><span class="p">;</span>
+
+            <span class="c1">// fingerprint match</span>
+            <span class="k">while</span> <span class="n">mask</span><span class="nf">.any</span><span class="p">()</span> <span class="p">{</span>
+                <span class="c1">// actual comparison, we can replace this with SIMD aswell but this should be</span>
+                <span class="c1">// trivial enough for compiler optimization</span>
+                <span class="k">let</span> <span class="n">set_index</span> <span class="o">=</span> <span class="n">mask</span><span class="nf">.first_set</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">();</span>
+                <span class="k">let</span> <span class="n">f</span> <span class="o">=</span> <span class="n">set_index</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="mi">16</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">;</span>
+                <span class="k">if</span> <span class="n">text_bytes</span><span class="p">[</span><span class="n">f</span><span class="o">..</span><span class="n">f</span> <span class="o">+</span> <span class="n">substr_len</span> <span class="o">-</span> <span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">substr_bytes</span><span class="p">[</span><span class="mi">1</span><span class="o">..</span><span class="n">substr_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="p">{</span>
+                    <span class="k">return</span> <span class="k">true</span><span class="p">;</span>
+                <span class="p">}</span>
+                <span class="c1">// f - 1 starting index of substring in the text</span>
+                <span class="n">mask</span><span class="nf">.set</span><span class="p">(</span><span class="n">set_index</span><span class="p">,</span> <span class="k">false</span><span class="p">);</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="k">false</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Padding could be done in a better way</span>
+<span class="k">fn</span> <span class="nf">pad_text</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[</span><span class="nb">u8</span><span class="p">],</span> <span class="n">substr_len</span><span class="p">:</span> <span class="nb">usize</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">u8</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="c1">// Determine the padding needed</span>
+    <span class="k">let</span> <span class="n">padding_needed</span> <span class="o">=</span> <span class="p">(</span><span class="mi">16</span> <span class="o">-</span> <span class="p">(</span><span class="n">data</span><span class="nf">.len</span><span class="p">()</span> <span class="o">%</span> <span class="mi">16</span><span class="p">))</span> <span class="o">%</span> <span class="mi">16</span> <span class="o">+</span> <span class="n">substr_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">padded_data</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">with_capacity</span><span class="p">(</span><span class="n">data</span><span class="nf">.len</span><span class="p">()</span> <span class="o">+</span> <span class="n">padding_needed</span><span class="p">);</span>
+    <span class="n">padded_data</span><span class="nf">.extend_from_slice</span><span class="p">(</span><span class="n">data</span><span class="p">);</span>
+    <span class="n">padded_data</span><span class="nf">.resize</span><span class="p">(</span><span class="n">data</span><span class="nf">.len</span><span class="p">()</span> <span class="o">+</span> <span class="n">padding_needed</span><span class="p">,</span> <span class="sc">b'\0'</span><span class="p">);</span>
+    <span class="n">padded_data</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p><a href="https://godbolt.org/z/jMx5oYhM9">Example on Compiler Explorer</a></p>
+
+<p>This sub-string search example is based on <a href="http://0x80.pl/articles/simd-friendly-karp-rabin.html">SIMD-friendly Rabin-Karp modification</a>. While I haven’t benchmarked the algorithm myself, the referenced article does contain benchmarks demonstrating its effectiveness.</p>
+
+<h3 id="auto-vectorization">Auto Vectorization</h3>
+<p>Auto vectorization is a compiler optimization technique where the compiler automatically vectorizes array operations to some extent. While it’s generally beneficial to let the compiler handle most optimization tasks, auto vectorization doesn’t always yield the desired outcome, particularly in cases where vectorization is nontrivial. In such situations, you may need to manually write your own vectorized code. This is where the support for SIMD in modern languages truly shines, offering developers the flexibility to optimize performance-critical code.</p>
+
+<h3 id="wrap-up">Wrap-up</h3>
+<p>Vector primitives are incredibly powerful tools for speeding up computations. System programming languages are now incorporating support for them, whether through libraries or as first-class language features. This support gives developers the ability to leverage SIMD technology in a more portable manner, enabling us to write more efficient software.</p>
+
+<p>Hey, you made it to the end! You might want to check out a linear algebra library I recently wrote in Zig called <a href="https://github.com/AshishBhattarai/zig_matrix">zig_matrix</a>. I’m extensively using Zig’s <code class="language-plaintext highlighter-rouge">@Vector</code> SIMD support in my implementation of some of the most widely known and utilized linear algebra operations. Feel free to email me with any feedback or questions!</p>
+
+<h4 id="references">References</h4>
+<ul>
+  <li><a href="https://en.wikipedia.org/wiki/Data_parallelism#Description">Data Parallelism</a></li>
+  <li><a href="https://en.wikibooks.org/wiki/X86_Assembly/SSE">x86 Assembly/SSE</a></li>
+  <li><a href="https://developer.arm.com/documentation/dht0002/a/Introducing-NEON/What-is-SIMD-/ARM-SIMD-instructions">ARM SIMD instructions</a></li>
+  <li><a href="https://www.youtube.com/watch?v=wlvKAT7SZIQ">Parsing JSON Really Quickly: Lessons Learned</a></li>
+  <li><a href="http://0x80.pl/articles/simd-friendly-karp-rabin.html">SIMD-friendly Rabin-Karp modification</a></li>
+</ul>
+
+</article>
+
+      </div>
+    </main>
+
+    
+  </body>
+</html>
