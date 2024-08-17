@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://ricefields.me/feed.xml" rel="self" type="application/atom+xml" /><link href="https://ricefields.me/" rel="alternate" type="text/html" /><updated>2024-08-16T21:24:23+07:00</updated><id>https://ricefields.me/feed.xml</id><title type="html">Rice Fields</title><subtitle>A blog mostly dedicated to computer science</subtitle><author><name>RiceFields</name></author><entry><title type="html">Sparse Set - stable pointers</title><link href="https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html" rel="alternate" type="text/html" title="Sparse Set - stable pointers" /><published>2024-08-16T00:00:00+07:00</published><updated>2024-08-16T00:00:00+07:00</updated><id>https://ricefields.me/2024/08/16/sparse-set-stable-pointer</id><content type="html" xml:base="https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html"><![CDATA[<p>This is a continuation of my last article, <a href="/2024/08/15/sparse-set.html">‘Sparse Set - A Flexible, Cache-Friendly Data Structure’</a>.</p>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://ricefields.me/feed.xml" rel="self" type="application/atom+xml" /><link href="https://ricefields.me/" rel="alternate" type="text/html" /><updated>2024-08-17T10:23:38+07:00</updated><id>https://ricefields.me/feed.xml</id><title type="html">Rice Fields</title><subtitle>A blog mostly dedicated to computer science</subtitle><author><name>RiceFields</name></author><entry><title type="html">Sparse Set - stable pointers</title><link href="https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html" rel="alternate" type="text/html" title="Sparse Set - stable pointers" /><published>2024-08-16T00:00:00+07:00</published><updated>2024-08-16T00:00:00+07:00</updated><id>https://ricefields.me/2024/08/16/sparse-set-stable-pointer</id><content type="html" xml:base="https://ricefields.me/2024/08/16/sparse-set-stable-pointer.html"><![CDATA[<p>This is a continuation of my last article, <a href="/2024/08/15/sparse-set.html">‘Sparse Set - A Flexible, Cache-Friendly Data Structure’</a>.</p>
 
 <p>In the last article, we implemented a basic sparse set. Now, let’s improve our implementation by adding support for stable pointers. To achieve this, we can make a slight adjustment, instead of storing data in the dense array, we’ll store it directly in the sparse array.</p>
 
@@ -159,7 +159,7 @@
        <span class="k">if</span><span class="p">(</span><span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">])</span> <span class="p">{</span>
            <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="n">page</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
            <span class="k">auto</span> <span class="n">current_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">];</span>
-           <span class="k">return</span> <span class="n">current_idx</span> <span class="o">==</span> <span class="n">dense_idx</span><span class="p">;</span>
+           <span class="k">return</span> <span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">&amp;&amp;</span> <span class="n">current_idx</span> <span class="o">==</span> <span class="n">dense_idx</span><span class="p">;</span>
        <span class="p">}</span>
         
        <span class="k">return</span> <span class="nb">false</span><span class="p">;</span> 
@@ -183,7 +183,7 @@
     <span class="p">}</span>
 <span class="p">};</span>
 </code></pre></div></div>
-<p><a href="https://godbolt.org/z/oK4zvWYdo">Complete Implementation on Compiler Explorer</a></p>
+<p><a href="https://godbolt.org/z/YdKejvP9h">Complete Implementation on Compiler Explorer</a></p>
 
 <p>This implementation does not include iterator support, so it is up to the reader to implement their own iterator. Note: iterators can be implemented using the dense array.</p>]]></content><author><name>RiceFields</name></author><category term="code" /><category term="data-structure" /><summary type="html"><![CDATA[Continuing from my last article on sparse sets, this article goes into detail on how to implement a sparse set with stable pointers.]]></summary></entry><entry><title type="html">Sparse Set - flexible cache friendy data structure</title><link href="https://ricefields.me/2024/08/15/sparse-set.html" rel="alternate" type="text/html" title="Sparse Set - flexible cache friendy data structure" /><published>2024-08-15T00:00:00+07:00</published><updated>2024-08-15T00:00:00+07:00</updated><id>https://ricefields.me/2024/08/15/sparse-set</id><content type="html" xml:base="https://ricefields.me/2024/08/15/sparse-set.html"><![CDATA[<p>The first time I heard about a sparse data structure (specifically, sparse arrays) was in a computer science class. Back then, I didn’t think much of them and didn’t encounter them again until recent years. I’ve been working a lot with contiguous memory and dynamic arrays. While dynamic arrays are extremely cache-friendly and allow code to take advantage of the spatial locality of the CPU cache, operating on them often gets quite tricky. Lets jump into the problems with plain dynamic arrays first.</p>
 
@@ -278,7 +278,7 @@
         <span class="k">if</span><span class="p">(</span><span class="n">idx</span> <span class="o">&gt;=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">.</span><span class="n">size</span><span class="p">())</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
         <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">idx</span><span class="p">];</span>
         <span class="k">auto</span> <span class="n">current_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">].</span><span class="n">sparse_idx</span><span class="p">;</span>
-        <span class="k">return</span> <span class="n">idx</span> <span class="o">==</span> <span class="n">current_idx</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">&amp;&amp;</span> <span class="n">idx</span> <span class="o">==</span> <span class="n">current_idx</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="k">typename</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">DenseElement</span><span class="o">&gt;::</span><span class="n">const_iterator</span><span class="p">,</span> 
@@ -290,7 +290,7 @@
     <span class="p">}</span>
 <span class="p">};</span>
 </code></pre></div></div>
-<p><a href="https://godbolt.org/z/YEhMTac1P">Complete Implementation on Compiler Explorer</a></p>
+<p><a href="https://godbolt.org/z/nTv49Yz3q">Complete Implementation on Compiler Explorer</a></p>
 
 <h2 id="stable-pointers">Stable Pointers</h2>
 <p>Stable indices are useful, but we can also achieve stable pointers for elements in the sparse set. The second part of this post goes into the details of implementing a sparse set with stable pointers. <a href="/2024/08/16/sparse-set-stable-pointer.html">Link to the post</a></p>

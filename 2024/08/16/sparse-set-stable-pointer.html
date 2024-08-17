@@ -194,7 +194,7 @@
        <span class="k">if</span><span class="p">(</span><span class="k">auto</span> <span class="n">page</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">pages</span><span class="p">[</span><span class="n">page_idx</span><span class="p">])</span> <span class="p">{</span>
            <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="n">page</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">page_offset</span><span class="p">];</span>
            <span class="k">auto</span> <span class="n">current_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">];</span>
-           <span class="k">return</span> <span class="n">current_idx</span> <span class="o">==</span> <span class="n">dense_idx</span><span class="p">;</span>
+           <span class="k">return</span> <span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">&amp;&amp;</span> <span class="n">current_idx</span> <span class="o">==</span> <span class="n">dense_idx</span><span class="p">;</span>
        <span class="p">}</span>
         
        <span class="k">return</span> <span class="nb">false</span><span class="p">;</span> 
@@ -218,7 +218,7 @@
     <span class="p">}</span>
 <span class="p">};</span>
 </code></pre></div></div>
-<p><a href="https://godbolt.org/z/oK4zvWYdo">Complete Implementation on Compiler Explorer</a></p>
+<p><a href="https://godbolt.org/z/YdKejvP9h">Complete Implementation on Compiler Explorer</a></p>
 
 <p>This implementation does not include iterator support, so it is up to the reader to implement their own iterator. Note: iterators can be implemented using the dense array.</p>
 

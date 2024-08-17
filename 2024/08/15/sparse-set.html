@@ -126,7 +126,7 @@
         <span class="k">if</span><span class="p">(</span><span class="n">idx</span> <span class="o">&gt;=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">.</span><span class="n">size</span><span class="p">())</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
         <span class="k">auto</span> <span class="n">dense_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">sparse</span><span class="p">[</span><span class="n">idx</span><span class="p">];</span>
         <span class="k">auto</span> <span class="n">current_idx</span> <span class="o">=</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">dense</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">].</span><span class="n">sparse_idx</span><span class="p">;</span>
-        <span class="k">return</span> <span class="n">idx</span> <span class="o">==</span> <span class="n">current_idx</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">dense_idx</span> <span class="o">&lt;</span> <span class="k">this</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">&amp;&amp;</span> <span class="n">idx</span> <span class="o">==</span> <span class="n">current_idx</span><span class="p">;</span>
     <span class="p">}</span>
 
     <span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="k">typename</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">DenseElement</span><span class="o">&gt;::</span><span class="n">const_iterator</span><span class="p">,</span> 
@@ -138,7 +138,7 @@
     <span class="p">}</span>
 <span class="p">};</span>
 </code></pre></div></div>
-<p><a href="https://godbolt.org/z/YEhMTac1P">Complete Implementation on Compiler Explorer</a></p>
+<p><a href="https://godbolt.org/z/nTv49Yz3q">Complete Implementation on Compiler Explorer</a></p>
 
 <h2 id="stable-pointers">Stable Pointers</h2>
 <p>Stable indices are useful, but we can also achieve stable pointers for elements in the sparse set. The second part of this post goes into the details of implementing a sparse set with stable pointers. <a href="/2024/08/16/sparse-set-stable-pointer.html">Link to the post</a></p>
